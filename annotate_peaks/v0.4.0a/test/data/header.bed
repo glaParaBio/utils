@@ -1,0 +1,5 @@
+#V1	V2	V3	V4	tss_id	strand	description	tss_distance	tss_distance_rank
+PbANKA_09_v3	1263000	1263100	peak_1	PBANKA_0933900.1	-	glyoxalase I, putative	-31131	1
+PbANKA_09_v3	1263000	1263100	peak_1	PBANKA_0938200.1	-	conserved Plasmodium protein, unknown function	110048	2
+PbANKA_09_v3	1263000	1263100	peak_1	PBANKA_0938800.1	-	conserved Plasmodium protein, unknown function	128161	3
+PbANKA_09_v3	1263000	1263100	peak_1	PBANKA_0941500.1	+	40S ribosomal protein S4, putative	-236907	4
