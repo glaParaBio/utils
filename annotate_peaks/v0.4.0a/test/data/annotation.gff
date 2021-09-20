@@ -21,6 +21,8 @@
 ##sequence-region PbANKA_14_v3 1 2549703
 ##sequence-region PbANKA_API_v3 1 34403
 ##sequence-region PbANKA_MIT_v3 1 5957
+PbANKA_09_v3	VEuPathDB	mRNA	4	10	.	+	.	ID=RNA1.1;Parent=RNA1;description=rna_1
+PbANKA_09_v3	VEuPathDB	mRNA	20	30	.	+	.	ID=RNA2.1;Parent=RNA2;description=rna_2
 PbANKA_09_v3	VEuPathDB	protein_coding_gene	1175534	1176326	.	+	.	ID=PBANKA_0932200;description=peptidyl-prolyl cis-trans isomerase%2C putative
 PbANKA_09_v3	VEuPathDB	mRNA	1175534	1176326	.	+	.	ID=PBANKA_0932200.1;Parent=PBANKA_0932200;Note=5.2.1.8 (Peptidylprolyl isomerase);description=peptidyl-prolyl cis-trans isomerase%2C putative
 PbANKA_09_v3	VEuPathDB	exon	1175534	1175545	.	+	.	ID=exon_PBANKA_0932200.1-E1;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200
@@ -327,10 +329,6 @@ PbANKA_07_v3	VEuPathDB	CDS	765960	765979	.	+	2	ID=PBANKA_0720900.1-p1-CDS6;Paren
 PbANKA_07_v3	VEuPathDB	CDS	766102	766145	.	+	0	ID=PBANKA_0720900.1-p1-CDS7;Parent=PBANKA_0720900.1;gene_id=PBANKA_0720900;protein_source_id=PBANKA_0720900.1-p1
 PbANKA_07_v3	VEuPathDB	CDS	766262	766323	.	+	1	ID=PBANKA_0720900.1-p1-CDS8;Parent=PBANKA_0720900.1;gene_id=PBANKA_0720900;protein_source_id=PBANKA_0720900.1-p1
 PbANKA_07_v3	VEuPathDB	CDS	766421	766449	.	+	2	ID=PBANKA_0720900.1-p1-CDS9;Parent=PBANKA_0720900.1;gene_id=PBANKA_0720900;protein_source_id=PBANKA_0720900.1-p1
-PbANKA_API_v3	VEuPathDB	protein_coding_gene	19957	20637	.	+	.	ID=PBANKA_API00180;Name=RPS2;description=30S ribosomal protein S2%2C putative
-PbANKA_API_v3	VEuPathDB	mRNA	19957	20637	.	+	.	ID=PBANKA_API00180.1;Parent=PBANKA_API00180;description=30S ribosomal protein S2%2C putative
-PbANKA_API_v3	VEuPathDB	exon	19957	20637	.	+	.	ID=exon_PBANKA_API00180.1-E1;Parent=PBANKA_API00180.1;gene_id=PBANKA_API00180
-PbANKA_API_v3	VEuPathDB	CDS	19957	20637	.	+	0	ID=PBANKA_API00180.1-p1-CDS1;Parent=PBANKA_API00180.1;gene_id=PBANKA_API00180;protein_source_id=PBANKA_API00180.1-p1
 PbANKA_13_v3	VEuPathDB	protein_coding_gene	419821	420369	.	+	.	ID=PBANKA_1308700;description=conserved protein%2C unknown function
 PbANKA_13_v3	VEuPathDB	mRNA	419821	420369	.	+	.	ID=PBANKA_1308700.1;Parent=PBANKA_1308700;description=conserved protein%2C unknown function
 PbANKA_13_v3	VEuPathDB	exon	419821	420369	.	+	.	ID=exon_PBANKA_1308700.1-E1;Parent=PBANKA_1308700.1;gene_id=PBANKA_1308700

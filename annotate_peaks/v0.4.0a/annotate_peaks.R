@@ -7,8 +7,10 @@
 suppressWarnings(library(data.table))
 suppressWarnings(library(argparse))
 
+options(scipen= 9)
+
 parser <- ArgumentParser(description= 'Annotate peaks with genes in their vicinity')
-parser$add_argument('--peaks', '-p', help= 'Peaks to annotate in bed-compatible format', required= TRUE, metavar= 'FILE')
+parser$add_argument('--peaks', '-p', help= 'Peaks to annotate in bed-compatible format [%(default)s]', default= "-", metavar= 'FILE')
 parser$add_argument('--gff', '-gff', help= 'Annotation file in GFF format', required= TRUE, metavar= 'FILE')
 
 def <- 'mRNA'
@@ -24,7 +26,7 @@ def <- 10000
 parser$add_argument('--span', '-s', type= 'integer', help= 'Extend each peak by this many bases and assign genes whose TSS is in the intersection', default= def, metavar= sprintf('[%s]', def))
 
 def <- 'summit'
-parser$add_argument('--summit', '-sm', help= "Column name in the peak file giving the distance of the peak summit from the peak start. If set to '', use the peak mid-point", default= def,  metavar= sprintf('[%s]', def))
+parser$add_argument('--summit', '-sm', help= "Column name or column index in the peak file giving the distance of the peak summit from the peak start. If set to '', use the peak mid-point", default= def,  metavar= sprintf('[%s]', def))
 
 def <- -1
 parser$add_argument('--max-rank', '-r', help= 'Keep at most max-rank features closest to each peak. No limit if < 0', default= def,  metavar= sprintf('[%s]', def))
@@ -106,46 +108,28 @@ prepare_tss <- function(gff, feature_type, gene_key, extra, verbose) {
     xgff$unused <- '.'
     xgff <- xgff[, c('chrom', 'tss_start', 'tss_end', 'tss_id', 'unused', 'tss_strand', extra), with= FALSE]
 
-    # Prefix every column with a string that will make very unlikely to have
-    # duplicate columns with the peak file (not great but good enough). 
-    setnames(xgff, names(xgff), paste0('gff__', names(xgff))) 
+    # setnames(xgff, names(xgff), paste0('', names(xgff))) 
     setnames(xgff, names(xgff)[1], paste0('#', names(xgff)[1])) # Comment out header line
-    xgff <- unique(xgff[order(`#gff__chrom`, gff__tss_start, gff__tss_end)])
+    xgff <- unique(xgff[order(`#chrom`, tss_start, tss_end)])
     
     if(verbose) {
         write(sprintf('Found %s features\n', nrow(xgff)), stderr())
     }
-    stopifnot(length(xgff$gff__tss_id) == length(unique(xgff$gff__tss_id)))
-    xgff <- xgff[order(`#gff__chrom`, gff__tss_start)]
+    stopifnot(length(xgff$tss_id) == length(unique(xgff$tss_id)))
+    xgff <- xgff[order(`#chrom`, tss_start)]
     return(xgff)
 }
 
-closest <- function(peaks, tss, summit, tss_strand= '.', verbose= FALSE, tmpdir) {
-    stopifnot(tss_strand %in% c('+', '-', '.'))
-    if(tss_strand != '.') {
-        tss <- tss[gff__tss_strand == tss_strand]
+closest <- function(peaks, tss, summit, strand= '.', verbose= FALSE, tmpdir) {
+    stopifnot(strand %in% c('+', '-', '.'))
+    if(strand != '.') {
+        tss <- tss[tss_strand == strand]
         ignore <- ' -id '
     } else {
         ignore <- ''
     }
 
     peaks <- copy(peaks)
-    # Prepare peak file. Get the summit 
-    #peaks <- peak_reader(peak_file)
-    #peaks[, id__ := 1:nrow(peaks)]
-
-    #if(summit != '') {
-    #    offset <- peaks[[summit]]
-    #} else {
-    #    offset <- round((peaks[,3] - peaks[,2])/2)[[1]]
-    #    offset <- ifelse(offset == 0, 1, offset)
-    #}
-    #peak_summit <- peaks[, list()]
-    #setnames(peak_summit, names(peak_summit), c('#chrom', 'start'))
-    #peak_summit[, ref_start := start + offset]
-    #peak_summit[, ref_end := ref_start + 1]
-    #peak_summit[, start := NULL]
-    #peak_summit[, id__ := 1:nrow(peaks)]
     setcolorder(peaks, c('#chrom', 'summit_start', 'summit_end'))
 
     summit_file <- file.path(tmpdir, 'summit.bed') 
@@ -157,7 +141,6 @@ closest <- function(peaks, tss, summit, tss_strand= '.', verbose= FALSE, tmpdir)
     out_intx <- file.path(tmpdir, 'intx_closest.bed') 
 
     cmd <- sprintf("set -e \
-    set -o pipefail \
     closestBed %s -a %s -b %s -D b > %s", ignore, summit_file, tss_file, out_intx)
 
     if(verbose) {
@@ -169,12 +152,9 @@ closest <- function(peaks, tss, summit, tss_strand= '.', verbose= FALSE, tmpdir)
         stop(sprintf('Executing %s', cmd))
     }
     intx <- fread(out_intx, header= FALSE, col.names= c(names(peaks), names(tss), 'tss_distance'), sep= '\t')
-    intx[, `#gff__chrom` := NULL]
-    #intx[, summit_start := NULL]
-    #intx[, summit_end := NULL]
-    #intx[, gff__tss_start := NULL]
-    #intx[, gff__tss_end := NULL]
-    intx[, gff__unused := NULL]
+    intx[, `#chrom` := NULL]
+    intx[, unused := NULL]
+    intx <- intx[tss_start >= 0] # Remove peaks with no feature assigned (e.g. on the edge of chroms)
 
     return(intx) 
 }
@@ -183,9 +163,9 @@ intersection <- function(peaks, tss, span, verbose, tmpdir) {
 
     peaks <- copy(peaks)
 
-    peaks[, extended_start := peak_start - span]
+    peaks[, extended_start := summit_start - span]
     peaks[, extended_start := ifelse(extended_start < 0, 0, extended_start)]
-    peaks[, extended_end := peak_end + span]
+    peaks[, extended_end := summit_end + span]
     setcolorder(peaks, c('#chrom', 'extended_start', 'extended_end'))
 
     peak_file <- file.path(tmpdir, 'peaks.bed') 
@@ -207,97 +187,63 @@ intersection <- function(peaks, tss, span, verbose, tmpdir) {
     if(exit != 0) {
         stop(sprintf('Executing %s', cmd))
     }
+    
+    tss_names <- names(tss)
+    tss_names[which(tss_names == '#chrom')] <- '#tss_chrom'
+    
+    hdr <- c(names(peaks), tss_names)
 
-    hdr <- c(names(peaks), names(tss))
-    stopifnot(length(hdr) == length(unique(hdr)))
-
-    if(file.size(out_intx) == 0) {
-        return(NA)
+    if(file.size(out_intx) > 0) {
+        intx <- fread(out_intx, header= FALSE, sep= '\t')
+    } else {
+        intx <- list() 
+        for(x in hdr) {
+            intx[[x]] <- NA
+        }
+        intx <- as.data.table(intx)[0, ]
     }
-    intx <- fread(out_intx, header= FALSE, sep= '\t')
     setnames(intx, names(intx), hdr)
+    intx[, `#tss_chrom` := NULL]
+    stopifnot(length(names(intx)) == length(unique(names(intx))))
 
     intx[, extended_start := NULL]
     intx[, extended_end := NULL]
     peaks[, extended_start := NULL]
     peaks[, extended_end := NULL]
 
-    stopifnot(intx$gff__tss_strand %in% c('+', '-'))
+    stopifnot(intx$tss_strand %in% c('+', '-'))
 
-    intx[, tss_distance := ifelse(gff__tss_strand == "+", summit_start - gff__tss_start,
-                                  gff__tss_start - summit_start)]
+    intx[, tss_distance := ifelse(tss_strand == "+", summit_start - tss_start,
+                                  tss_start - summit_start)]
     
-    intx[, `#gff__chrom` := NULL]
-    intx[, gff__tss_start := NULL]
-    intx[, gff__tss_end := NULL]
-    intx[, gff__unused := NULL]
+    intx[, unused := NULL]
     
-    intx <- intx[order(`#chrom`, peak_start, peak_end, abs(tss_distance))]
-    
+    intx <- intx[order(`#chrom`, summit_start, summit_end, abs(tss_distance))]
+    setcolorder(intx, c('#chrom', 'summit_start', 'summit_end')) 
     if(verbose) {
         write(sprintf('Intersection returned %s features\n', nrow(intx)), stderr())
     }
     return(intx)
 }
 
-merge_intx <- function(region_intx, xclosest, max_rank) {
-    hdr <- names(xclosest)[1:3]
-    setnames(xclosest, 1:3, c('chrom', 'start', 'end'))
-    xclosest[, id__ := paste(chrom, start, end, sep= '_')]
-
-    if(is.data.table(region_intx)) {
-        setnames(region_intx, 1:3, c('chrom', 'start', 'end'))
-        region_intx[, id__ := paste(chrom, start, end, sep= '_')]
-        stopifnot(identical(names(region_intx), names(xclosest)))
-        stopifnot(region_intx$id__ %in% xclosest$id__)
-        intx <- unique(rbind(region_intx, xclosest))
-    } else {
-        intx <- xclosest
-    }
-
-    dist_rank <- unique(intx[, list(id__, gff__tss_id, tss_distance)])
-    dist_rank <- dist_rank[order(id__, abs(tss_distance))]
-    dist_rank[, tss_distance_rank := 1:nrow(.SD), by= id__]
-
-    intx_hdr <- names(intx)
-    intx <- merge(intx, dist_rank, by= c('id__', 'gff__tss_id', 'tss_distance'))
-    setcolorder(intx, intx_hdr)
-    intx[, id__ := NULL]
-    intx <- intx[order(chrom, start, end, tss_distance_rank)]
-    setnames(intx, 1:length(hdr), hdr)
-    setnames(intx, names(intx), sub('^gff__', '', names(intx)))
-
-    if(max_rank > 0) {
-        intx <- intx[tss_distance_rank <= max_rank]
-    }
-
-    return(intx)
-}
-
-intervening_tss <- function(peaks, annotated_peaks, tss, verbose, tmpdir= tmpdir) {
+intervening_tss <- function(annotated_peaks, tss, verbose, tmpdir= tmpdir) {
     # We need to capture the TSSs within the most extreme TSSs already in output.
-    annotated_peaks <- copy(annotated_peaks)
-    annotated_peaks <- merge(annotated_peaks, tss[, list(gff__tss_start, gff__tss_end, gff__tss_id)], by= 'gff__tss_id')
-    annotated_peaks <- annotated_peaks[, list(peak_start= min(gff__tss_start) - 1, peak_end= max(gff__tss_end)), by= list(`#chrom`, x_= peak_start, y_= peak_end)]
+    # Create intervals where each peak_id goes from the leftmost TSS to rightmost TSS
+    extended_peaks <- annotated_peaks[, list(summit_start= min(tss_start), summit_end= max(tss_end)), by= list(`#chrom`, id__, xsummit_start= summit_start, xsummit_end= summit_end)]
+    setcolorder(extended_peaks, c('#chrom', 'summit_start', 'summit_end'))
+    
+    intervene <- intersection(extended_peaks, tss, span= 0, verbose= verbose, tmpdir)
 
-    xpeaks <- merge(peaks, annotated_peaks, by.x= c('#chrom', 'peak_start', 'peak_end'), by.y= c('#chrom', 'x_', 'y_'))
-    xpeaks[,2] <- xpeaks$peak_start
-    xpeaks[,3] <- xpeaks$peak_end
-    xpeaks[, peak_start__ := NULL]
-    xpeaks[, peak_end__ := NULL]
-    xpeaks[['summit__']] <- xpeaks$summit_pos__ - as.integer(xpeaks[,2])
+    # Replace extended coords with original summit_start/end
+    intervene[, summit_start := xsummit_start]
+    intervene[, summit_end := xsummit_end]
+    intervene[, xsummit_start := NULL]
+    intervene[, xsummit_end := NULL]
 
-    xpeaks[, summit_pos__ := NULL]
-    peaks[, summit_pos__ := NULL]
+    # Recalculate distance
+    intervene[, tss_distance := ifelse(tss_strand == "+", summit_start - tss_start,
+                                  tss_start - summit_start)]
 
-    intervene <- intersection(xpeaks, tss, span= 0, verbose= verbose, tmpdir)
-    for(x in names(xpeaks)) {
-        if(x != 'row_id__') {
-            intervene[[x]] <- NULL
-        }
-    }
-    intervene <- merge(peaks, intervene, by= 'row_id__')
-    intervene[, row_id__ := NULL]
     return(intervene)
 }
 
@@ -305,6 +251,43 @@ get_tmpdir <- function() {
     tmpdir <- tempfile(pattern= paste0('tmp_annotate_peaks.', datestr()), tmpdir= '.')
     dir.create(tmpdir)
     return(tmpdir)
+}
+
+prepare_peaks <- function(peaks, summit) {
+    # Prepare the working bed file
+    wrk_peaks <- copy(peaks[, 1:3])
+    wrk_peaks[, id__ := peaks$id__]
+    setnames(wrk_peaks, 1:3, c('#chrom', 'peak_start', 'peak_end'))
+
+    # Add summit column
+    if(grepl("^[[:digit:]]", summit) & ! summit %in% names(peaks)) {
+        summit <- paste0('V', summit)
+    }
+    if(summit %in% names(peaks)) {
+        peaks[[summit]] <- as.integer(peaks[[summit]])
+        wrk_peaks[, summit := peaks[[summit]]]
+        if(any(is.na(wrk_peaks$summit))) {
+            stop(sprintf('Column %s contains non-integer values', summit))
+        }
+    } else if(summit == '') {
+        offset <- round((wrk_peaks$peak_end - wrk_peaks$peak_start)/2)
+        offset <- ifelse(offset == 0, 1, offset)
+        offset <- as.integer(offset)
+        wrk_peaks[, summit := offset]
+    } else {
+        msg <- sprintf('Summit column "%s" not found. Perhaps you need to adjust the argument to option --summit?', summit)
+        stop(msg)
+    }
+    wrk_peaks[, summit_start := peak_start + summit - 1]
+    wrk_peaks[, summit_end := summit_start + 1]
+    # Keep only necessary columns
+    wrk_peaks[, peak_start := NULL]
+    wrk_peaks[, peak_end := NULL]
+    wrk_peaks[, summit := NULL]
+    setcolorder(wrk_peaks, c('#chrom', 'summit_start', 'summit_end'))
+    wrk_peaks <- unique(wrk_peaks)
+    wrk_peaks <- wrk_peaks[order(`#chrom`, summit_start, summit_end)]
+    return(wrk_peaks)
 }
 
 # -----------------------
@@ -316,34 +299,11 @@ if(args$peaks == '-') {
     peaks <- fread(args$peaks, sep= '\t')
 }
 stopifnot(!grepl('id__', names(peaks)))
-peaks[, id__ := 1:nrow(peaks)]
 peaks[, 2] <- as.integer(unlist(peaks[, 2]))
 peaks[, 3] <- as.integer(unlist(peaks[, 3]))
+peaks[, id__ := sprintf('%s_%s_%s', peaks[[1]], peaks[[2]], peaks[[3]])]
 
-# Prepare the working bed file
-wrk_peaks <- copy(peaks[, 1:3])
-wrk_peaks[, id__ := peaks$id__]
-setnames(wrk_peaks, 1:3, c('#chrom', 'peak_start', 'peak_end'))
-
-# Add summit column
-if(args$summit %in% names(peaks)) {
-    peaks[[args$summit]] <- as.integer(peaks[[args$summit]])
-    wrk_peaks[, summit := peaks[[args$summit]]]
-    if(any(is.na(wrk_peaks$summit))) {
-        stop(sprintf('Column %s contains non-integer values', args$summit))
-    }
-} else if(args$summit == '') {
-    offset <- round((wrk_peaks$peak_end - wrk_peaks$peak_start)/2)
-    offset <- ifelse(offset == 0, 1, offset)
-    offset <- as.integer(offset)
-    wrk_peaks[, summit := offset]
-} else {
-    msg <- sprintf('Summit column "%s" not found. Perhaps you need to adjust the argument to option --summit?', args$summit)
-    stop(msg)
-}
-wrk_peaks[, summit_start := peak_start + summit]
-wrk_peaks[, summit_end := summit_start + 1]
-wrk_peaks <- wrk_peaks[order(`#chrom`, peak_start, peak_end)]
+wrk_peaks <- prepare_peaks(peaks, args$summit)
 
 tmpdir <- get_tmpdir()
 
@@ -352,30 +312,46 @@ tss <- prepare_tss(args$gff, args$feature_type, args$gene_key, args$extra, args$
 region_intx <- intersection(wrk_peaks, tss, args$span, verbose= args$verbose, tmpdir= tmpdir)
 
 xclosest <- closest(wrk_peaks, tss, verbose= args$verbose, tmpdir= tmpdir)
-xclosest_plus <- closest(wrk_peaks, tss, tss_strand= '+' ,verbose= args$verbose, tmpdir= tmpdir)
-xclosest_minus <- closest(wrk_peaks, tss, tss_strand= '-' ,verbose= args$verbose, tmpdir= tmpdir)
-xclosest <- unique(rbindlist(list(xclosest, xclosest_plus, xclosest_minus)))
+xclosest_plus <- closest(wrk_peaks, tss, strand= '+' ,verbose= args$verbose, tmpdir= tmpdir)
+xclosest_minus <- closest(wrk_peaks, tss, strand= '-' ,verbose= args$verbose, tmpdir= tmpdir)
 
-print(xclosest)
-quit()
+xclosest <- unique(rbindlist(list(xclosest, xclosest_plus, xclosest_minus, region_intx), use.names= TRUE))
 
-intervene <- intervening_tss(wrk_peaks, xclosest, tss, verbose= args$verbose, tmpdir= tmpdir)
+intervene <- intervening_tss(xclosest, tss, verbose= args$verbose, tmpdir= tmpdir)
 
 xclosest <- unique(rbind(xclosest, intervene))
+xclosest[, tss_start := NULL]
+xclosest[, tss_end := NULL]
 
-intx <- merge_intx(region_intx, xclosest, args$max_rank)
+xclosest <- xclosest[order(id__, abs(tss_distance))]
+xclosest[, tss_distance_rank := 1:nrow(.SD), by= id__]
 
-if(identical(names(intx)[6], 'tss_strand') & (all(intx$tss_strand == '.') | all(is.na(intx$tss_strand)))) {
-    # If the input peak file contains a "tss_strand" column in position 6 and this
-    # column is only missing values, replace it with the GFF tss_strand
-    intx[, tss_strand := NULL]
-    setcolorder(intx, c(1:5, which(names(intx) == 'tss_strand')))
+xclosest[, `#chrom` := NULL]
+xclosest[, summit_start := NULL]
+xclosest[, summit_end := NULL]
+
+for(x in names(xclosest)) {
+    if(x == "id__") {
+        next
+    }
+    peaks[[x]] <- NULL
 }
+peaks <- unique(peaks)
+intx <- merge(peaks, xclosest, by= 'id__', sort= FALSE, all.x= TRUE)
+intx <- intx[order(intx[[1]], intx[[2]], intx[[3]], tss_distance_rank)]
+intx[, id__ := NULL]
+peaks[, id__ := NULL]
 
 # Sanity checks
-stopifnot(nrow(peaks) == nrow(intx[tss_distance_rank == 1]))
-stopifnot(identical(sort(peaks[[2]]), sort(intx[tss_distance_rank == 1][[2]])))
+stopifnot(nrow(peaks) == nrow(intx[tss_distance_rank == 1 | is.na(tss_distance_rank)]))
+stopifnot(identical(sort(peaks[[2]]), sort(intx[tss_distance_rank == 1 | is.na(tss_distance_rank)][[2]])))
 stopifnot(names(peaks) %in% names(intx))
 
+if(!grepl('^#', names(intx)[1])) {
+    setnames(intx, names(intx)[1], paste0('#', names(intx)[1]))
+}
 write.table(intx, file= stdout(), row.names= FALSE, sep= '\t', quote= FALSE)
+
+unlink(tmpdir, recursive= TRUE)
 quit()
+
