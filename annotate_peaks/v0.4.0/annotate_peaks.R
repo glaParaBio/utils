@@ -71,8 +71,25 @@ get_gff_attribute <- function(gff_attr, key) {
     return(values)
 }
 
+isGzip <- function(path){
+    # Adapted from https://stackoverflow.com/questions/29493302/how-to-check-if-a-file-is-compressed-in-r
+    f <- file(path)
+    ext <- summary(f)$class
+    close.connection(f)
+    if(ext == 'gzfile') {
+        return(TRUE)
+    } else {
+        return(FALSE)
+    }
+}
+
 prepare_tss <- function(gff, feature_type, gene_key, extra, verbose) {
-    xgff <- fread(cmd= sprintf('grep -v "^#" %s | awk -v FS="\t" \'$3 == "%s"\'', gff, feature_type), header= FALSE, sep= '\t')
+    if(gff != '-' & isGzip(gff) == TRUE) {
+        xcat <- 'gzip -cd'
+    } else {
+        xcat <- 'cat'
+    }
+    xgff <- fread(cmd= sprintf('%s %s | grep -v "^#" | awk -v FS="\t" \'$3 == "%s"\'', xcat, gff, feature_type), header= FALSE, sep= '\t')
     if(nrow(xgff) == 0) {
         stop(sprintf('There are no records of type "%s" in file "%s"', feature_type, gff))
     }
