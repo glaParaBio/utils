@@ -322,19 +322,24 @@ peaks[, id__ := sprintf('%s_%s_%s', peaks[[1]], peaks[[2]], peaks[[3]])]
 
 wrk_peaks <- prepare_peaks(peaks, args$summit)
 
-tmpdir <- get_tmpdir()
 
 tss <- prepare_tss(args$gff, args$feature_type, args$gene_key, args$extra, args$verbose)
 
-region_intx <- intersection(wrk_peaks, tss, args$span, verbose= args$verbose, tmpdir= tmpdir)
+tryCatch({
+        tmpdir <- get_tmpdir()
+        
+        region_intx <- intersection(wrk_peaks, tss, args$span, verbose= args$verbose, tmpdir= tmpdir)
 
-xclosest <- closest(wrk_peaks, tss, verbose= args$verbose, tmpdir= tmpdir)
-xclosest_plus <- closest(wrk_peaks, tss, strand= '+' ,verbose= args$verbose, tmpdir= tmpdir)
-xclosest_minus <- closest(wrk_peaks, tss, strand= '-' ,verbose= args$verbose, tmpdir= tmpdir)
+        xclosest <- closest(wrk_peaks, tss, verbose= args$verbose, tmpdir= tmpdir)
+        xclosest_plus <- closest(wrk_peaks, tss, strand= '+' ,verbose= args$verbose, tmpdir= tmpdir)
+        xclosest_minus <- closest(wrk_peaks, tss, strand= '-' ,verbose= args$verbose, tmpdir= tmpdir)
 
-xclosest <- unique(rbindlist(list(xclosest, xclosest_plus, xclosest_minus, region_intx), use.names= TRUE))
+        xclosest <- unique(rbindlist(list(xclosest, xclosest_plus, xclosest_minus, region_intx), use.names= TRUE))
 
-intervene <- intervening_tss(xclosest, tss, verbose= args$verbose, tmpdir= tmpdir)
+        intervene <- intervening_tss(xclosest, tss, verbose= args$verbose, tmpdir= tmpdir)
+    }, finally= {
+        unlink(tmpdir, recursive= TRUE)
+    })
 
 xclosest <- unique(rbind(xclosest, intervene))
 xclosest[, tss_start := NULL]
@@ -369,6 +374,5 @@ if(!grepl('^#', names(intx)[1])) {
 }
 write.table(intx, file= stdout(), row.names= FALSE, sep= '\t', quote= FALSE)
 
-unlink(tmpdir, recursive= TRUE)
 quit()
 
