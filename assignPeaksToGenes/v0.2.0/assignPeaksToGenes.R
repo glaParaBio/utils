@@ -161,6 +161,7 @@ prepare_tss <- function(gff, feature_type, feature_name, verbose) {
         stop(sprintf('There are no records of type [%s] in file "%s"', feature_type, gff))
     }
     setnames(xgff, c('V1', 'V4', 'V5', 'V7', 'V9'), c('chrom', 'start', 'end', 'strand', 'gff_attr'))
+    xgff <- unique(xgff)
     stopifnot(xgff$strand %in% c('+', '-'))
     xgff[, start := start - 1]
     xgff[, tss_start := ifelse(strand == '+', start, end - 1)]
