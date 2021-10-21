@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+
+import subprocess
+import pandas
+import argparse
+import requests
+import io
+import sys
+import re
+import os
+
+query_help = '''\
+Query for accession IDs or return a table of available metadata
+'''
+
+query_epilog = '''\
+---------------------------- EXAMPLES ---------------------------------------
+
+Markdown table of all the metadata columns provided by ENA
+
+    ena query -f markdown 
+
+All metadata for accession(s)
+
+    ena query PRJNA433164
+
+Select some columns:
+
+    ena query -f markdown -i 'sample_title|run_accession|fastq_ftp' PRJNA433164
+'''
+
+download_help = '''\
+Download files for accession IDs
+'''
+
+download_epilog = '''\
+---------------------------- EXAMPLES ---------------------------------------
+
+Use -n/--dryrun mode to only print the download commands
+
+    ena download -n PRJNA433164
+
+Make output filename more descriptive by prefixing it with sample_title:
+
+    ena download -n -p '{sample_title}.' PRJNA433164
+
+Only download the first n lines
+
+    ena download -n -l 40000 PRJNA433164
+'''
+
+parser = argparse.ArgumentParser(description= 'Query and download from ENA', formatter_class= argparse.RawTextHelpFormatter)
+parser.add_argument('--version', '-v', action='version', version='%(prog)s 0.1.0')
+
+subparsers = parser.add_subparsers(help='', dest= 'subcommand')
+subparsers.required= True
+
+parser_query = subparsers.add_parser('query', help= query_help, description= query_help, epilog= query_epilog, formatter_class= argparse.RawDescriptionHelpFormatter)
+parser_download = subparsers.add_parser('download', help= download_help, description= download_help, epilog= download_epilog, formatter_class= argparse.RawDescriptionHelpFormatter)
+
+prefix_help = {'help': "Make filenames more informative by adding this prefix. Strings in curly braces will be replaced by the corresponding entry from the metadata table. E.g., '{sample_title}.{library_strategy}.' [%(default)s]",
+    'default': ''}
+
+parser_query.add_argument('accessions', help= 'List of accession IDs. If missing, return a table of available metadata columns', nargs= '*')
+parser_query.add_argument('--prefix', '-p', **prefix_help)
+parser_query.add_argument('--format', '-f', help= 'Output format [%(default)s]', choices= ['markdown', 'tsv'], default= 'tsv')
+parser_query.add_argument('--transpose', '-t', help= 'Transpose table (more readable with more columns than rows) and use the given column as header e.g. run_accession', default= None)
+parser_query.add_argument('--exclude-columns', '-e', help= 'Regular expression of columns to exclude [%(default)s]', default= '')
+parser_query.add_argument('--include-columns', '-i', help= 'Regular expression of columns to include [%(default)s]', default= '.*')
+parser_query.add_argument('--drop-invariant-cols', '-D', help= 'Drop columns with the same value across all rows', action= 'store_true')
+
+parser_download.add_argument('accessions', help= 'List of accession IDs', nargs= '+')
+parser_download.add_argument('--prefix', '-p', **prefix_help)
+parser_download.add_argument('--outdir', '-d', help= 'Change to this output directory before downloading [%(default)s]', default= '.')
+parser_download.add_argument('--n-lines', '-l', help= 'Download up to this many lines per file, no limit if <= 0 [%(default)s]', default= -1, type= int)
+parser_download.add_argument('--dryrun', '--dry-run', '-n', help= 'Only print the download commands', action= 'store_true')
+
+
+def get_available_fields(for_type= 'read_run', include= '.*', exclude= ''):
+    url = "https://www.ebi.ac.uk/ena/portal/api/returnFields?dataPortal=ena&result={for_type}".format(for_type= for_type)
+    r = requests.get(url)
+    if r.status_code != 200:
+        raise Exception('Return code %s' % r.status_code)
+    txt = io.StringIO(r.text)
+    table = pandas.read_csv(txt, sep='\t')
+    selected = select_by_regex(table.columnId, include, exclude)
+    table = table[table['columnId'].isin(selected)]
+    table = table.set_index('columnId', drop= False)
+    table = table.loc[selected]
+    return(table)
+
+def select_by_regex(lst, include= '.*', exclude= None):
+    
+    # This is will break if your regex has the pipe escaped (`\|`). We assume
+    # this doesn't happen since column names don't contain | anyway.
+    assert r'\|' not in include
+    include = include.split('|')
+    keep = []
+    for regex in include:
+        for x in lst:
+            if re.search(regex, x) is not None and x not in keep:
+                keep.append(x)
+    
+    if exclude is None or exclude == '':
+        exclude= '$^'
+    remove = []
+    for x in keep:
+        if re.search(exclude, x):
+            remove.append(x)
+    for x in remove:
+        keep.remove(x)
+    return keep
+
+def get_table(accessions, fields, drop_empty, drop_invariant_cols, prefix= ''):
+    if type(accessions) == str:
+        accessions = [accessions]
+    accessions = set(accessions)
+    
+    fields = list(fields)
+    
+    if len(accessions) == 0:
+        return []
+
+    results = []
+    for a in accessions:
+        url = "https://www.ebi.ac.uk/ena/portal/api/filereport?accession={accession}&fields={fields}&result=read_run".format(accession= a, fields= ','.join(fields))
+        r = requests.get(url)
+        if r.status_code != 200:
+            raise Exception('Return code %s' % r.status_code)
+        txt = io.StringIO(r.text)
+        table = pandas.read_csv(txt, sep='\t', usecols= fields)
+        results.append(table)
+    results = pandas.concat(results)
+
+    assert 'prefix' not in results.columns
+    prefix_column = make_prefix(results, prefix)
+    results.insert(0, 'prefix', prefix_column)
+
+    if drop_empty:
+        for x in results.columns:
+            is_empty = all(pandas.isna(results[x])) or set(results[x]) == {''}
+            if is_empty:
+                results.drop(x, axis= 1, inplace= True)
+    if drop_invariant_cols:
+        for x in results.columns:
+            is_invariant = len(set(results[x])) == 1
+            if is_invariant:
+                results.drop(x, axis= 1, inplace= True)
+
+    results.drop_duplicates(inplace= True)
+    return(results)
+
+def make_prefix(table, prefix):
+    prefix_fmt = []
+    for idx,row in table.iterrows():
+        fmt = prefix
+        do_check = True
+        for colname in table.columns:
+            if '{' + colname + '}' in prefix:
+                value = row[colname] 
+                if '{' in value and '}' in value:
+                    do_check = False
+                fmt = fmt.replace('{' + colname + '}', row[colname])
+        if do_check and '{' in fmt and '}' in fmt:
+            raise Exception('Some fields could not be formatted for %s' % prefix)
+        fmt = re.sub('\s', '_', fmt)
+        fmt = fmt.replace('/', '_')
+        fmt = fmt.replace('\\', '_')
+        fmt = fmt.replace("'", '"')
+        if fmt.startswith('.'):
+            fmt = '_' + fmt
+        prefix_fmt.append(fmt)
+    return prefix_fmt
+
+def make_download_table(accessions, prefix):
+    fields = get_available_fields().columnId
+    results = get_table(accessions, fields, prefix=prefix, drop_empty= False, drop_invariant_cols= False)
+    ftp = []
+    dest_file = []
+    fastq_bytes = []
+    for idx,row in results.iterrows():
+        fastqs = row.fastq_ftp.split(';')
+        fq_bytes = row.fastq_bytes.split(';')
+        for x,b in zip(fastqs, fq_bytes):
+            ftp.append(x)
+            fastq_bytes.append(int(b))
+            fn = row.prefix + os.path.basename(x)
+            dest_file.append(fn)
+    ftp = pandas.DataFrame({'fastq_ftp':ftp, 'dest_file': dest_file, 'fastq_bytes': fastq_bytes})
+    assert len(list(ftp.dest_file)) == len(set(ftp.dest_file))
+    return ftp
+
+def transpose(table, header_column, metadata_column_name= 'metadata'):
+    row_header = list(table.columns)
+    col_header = None
+    if header_column in table.columns:
+        col_header = list(table[header_column])
+    table = table.transpose()
+    if col_header is not None:
+        table.columns = col_header
+    hdr = 'metadata'
+    table.insert(0, 'metadata', row_header)
+    return table
+
+def download(url, dest_file, n_lines, dryrun, expected_bytes):
+    if n_lines > 0:
+        head = '| gzip -cd | head -n %s | gzip ' % n_lines
+    else:
+        head = ''
+    if head == '':
+        silent = ''
+    else:
+        silent = '-s '
+
+    file_found = False
+    if os.path.exists(dest_file) and os.path.getsize(dest_file) == expected_bytes and head == '':
+        file_found = True
+        sys.stderr.write('File %s found - download skipped\n' % dest_file)
+
+    cmd = "curl {silent}-L {fastq_ftp} {head}> '{dest_file}'".format(silent= silent, head= head, fastq_ftp= url, dest_file= dest_file)
+    if '|' in cmd:
+        cmd = 'set -o pipefail && ' + cmd
+
+    if dryrun:
+        print(cmd)
+    elif not file_found:
+        sys.stderr.write(cmd + '\n')
+        p = subprocess.Popen(cmd, shell=True, stdout= subprocess.PIPE, stderr= subprocess.PIPE, executable= 'bash')
+        stdout, stderr = p.communicate()
+        if (p.returncode != 0 and head == '') or (head != '' and p.returncode not in [0, 141]):
+            try:
+                os.remove(row.dest_file)
+            except:
+                pass
+            raise Exception('Exit code %s while executing:\n%s\n%s' %(p.returncode, cmd, stderr.decode()))
+    return cmd
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+
+    if args.subcommand == 'query':
+        fields = get_available_fields(include= args.include_columns, exclude= args.exclude_columns)
+        if len(args.accessions) == 0:
+            results = fields
+        else:
+            results = get_table(accessions= args.accessions, fields= fields.columnId, prefix= args.prefix, drop_invariant_cols= args.drop_invariant_cols, drop_empty= True)
+        
+        if args.transpose is not None:
+            results = transpose(results, args.transpose)
+        if args.format == 'markdown':
+            print(results.to_markdown(index= False))
+        elif args.format == 'tsv':
+            csv = results.to_csv(None, sep= '\t', index= False)
+            if not csv.endswith('\n'):
+                csv += '\n'
+            sys.stdout.write(csv)
+    elif args.subcommand == 'download':
+        download_table = make_download_table(args.accessions, prefix= args.prefix)
+
+        if not os.path.exists(args.outdir):
+            sys.stderr.write('Creating output directory "%s"\n' % args.outdir)
+            os.makedirs(args.outdir, exist_ok= True)
+        os.chdir(args.outdir)
+        
+        for idx,row in download_table.iterrows():
+            cmd = download(row.fastq_ftp, row.dest_file, args.n_lines, args.dryrun, row.fastq_bytes)
+    sys.exit()
+

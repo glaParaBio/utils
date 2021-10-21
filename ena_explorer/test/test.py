@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+
+import unittest
+import sys
+import shutil
+import os
+import subprocess as sp
+import pandas
+import io
+import gzip
+import imp
+ena = imp.load_source('ena', './ena')
+
+class Test(unittest.TestCase):
+
+    def setUp(self):
+        sys.stderr.write('\n' + self.id().split('.')[-1] + ' ') # Print test name
+        if os.path.exists('test_out'):
+            shutil.rmtree('test_out')
+        os.mkdir('test_out')
+
+    def tearDown(self):
+        if os.path.exists('test_out'):
+            shutil.rmtree('test_out')
+
+    def testShowHelp(self):
+        p = sp.Popen("./ena --help", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+
+        p = sp.Popen("./ena query --help", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+
+    def testCanGetDescriptionTable(self):
+        p = sp.Popen("./ena query", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(['columnId', 'description'], list(table.columns))
+        self.assertTrue(len(table.index) > 10)
+
+    def testCanGetSelectedRowsFromDescriptionTable(self):
+        p = sp.Popen("./ena query -i '_accession' -e 'secondary'", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        cols = list(table.columnId)
+        self.assertTrue('study_accession' in cols)
+        self.assertTrue('run_accession' in cols)
+        self.assertTrue('accession' not in cols)
+        self.assertTrue('secondary_sample_accession' not in cols)
+
+        # Exclude comes after include: Exclude everything
+        p = sp.Popen("./ena query -i '.*' -e '.*'", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(0, len(table.index))
+
+    def testPrintOnlySelectedColumns(self):
+        p = sp.Popen("./ena query -i 'run_accession|sample_accession|sample_title' -e 'secondary' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(['run_accession', 'sample_accession', 'sample_title'], list(table.columns))
+
+        # Respect order
+        p = sp.Popen("./ena query -i 'run_accession|sample_title|sample_accession' -e 'secondary' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(['run_accession', 'sample_title', 'sample_accession'], list(table.columns))
+
+    def testPrintOnlySelectedColumnsWithPrefix(self):
+        p = sp.Popen("./ena query -i 'run_accession|sample_title|sample_accession' -e 'secondary' -p '{run_accession}' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(['prefix', 'run_accession', 'sample_title', 'sample_accession'], list(table.columns))
+
+    def testCanQueryForId(self):
+        p = sp.Popen("./ena query PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(len(table) > 10)
+        self.assertTrue(len(table.index) > 10)
+        
+        p = sp.Popen("./ena query SRR6676668 SRR6676669", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(2, len(table.index))
+
+        # Remove duplicates
+        p = sp.Popen("./ena query SRR6676668 SRR6676669 SRR6676669", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(2, len(table.index))
+
+    def testCanDropInvariantColumns(self):
+        p = sp.Popen("./ena query PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue('study_accession' in table.columns)
+        self.assertTrue('tax_id' in table.columns)
+
+        p = sp.Popen("./ena query -D PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue('study_accession' not in table.columns)
+        self.assertTrue('tax_id' not in table.columns)
+
+    def testCanAddPrefix(self):
+        p = sp.Popen("./ena query PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue('prefix' not in table.columns)
+
+        p = sp.Popen("./ena query -p 'foo_' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(all([x.startswith('foo_') for x in table.prefix]))
+
+    def testSpaceReplacedInPrefix(self):
+        p = sp.Popen("./ena query -p '{run_accession} {scientific_name}.' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(all([x.startswith('SRR66') for x in table.prefix]))
+        # Whitespace replaced
+        self.assertTrue(all(['_Plasmodium_berghei.' in x for x in table.prefix]))
+        
+        row = table[table.run_accession == 'SRR6676668']
+        self.assertEqual('SRR6676668_Plasmodium_berghei.', row.prefix.iloc[0])
+        row = table[table.run_accession == 'SRR6676699']
+        self.assertEqual('SRR6676699_Plasmodium_berghei.', row.prefix.iloc[0])
+
+    def testLeadingDotInPrefix(self):
+        # Leading dot
+        p = sp.Popen("./ena query -p '.foo_' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(all([x.startswith('_.foo_') for x in table.prefix]))
+
+    def testPrefixFailsWithMissingColumn(self):
+        p = sp.Popen("./ena query -p '{foo}' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertNotEqual(0, p.returncode)
+
+    def testMarkdown(self):
+        p = sp.Popen("./ena query -f markdown PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        stdout = stdout.decode()
+        self.assertTrue('| study_accession' in stdout)
+        self.assertTrue(len(stdout) > 100)
+
+    def canTranspose(self):
+        p = sp.Popen("./ena query -t run_accession SRR6676668 SRR6676669 SRR6676670", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual('metadata', table.columns[0])
+        self.assertTrue('SRR6676668' in table.columns)
+        self.assertTrue('SRR6676670' in table.columns)
+        self.assertTrue('fastq_ftp' in list(table.metadata))
+
+    def testDryRunDownload(self):
+        p = sp.Popen("./ena download -n -p '{sample_title}.' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        stdout = stdout.decode()
+        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676668/SRR6676668_1.fastq.gz > '0h_R+_1.SRR6676668_1.fastq.gz'" in stdout)
+        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676668/SRR6676668_2.fastq.gz > '0h_R+_1.SRR6676668_2.fastq.gz'" in stdout)
+        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/009/SRR6676699/SRR6676699_1.fastq.gz > '24h_R-_4.SRR6676699_1.fastq.gz'" in stdout)
+        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/009/SRR6676699/SRR6676699_2.fastq.gz > '24h_R-_4.SRR6676699_2.fastq.gz'" in stdout)
+
+    def testDryRunDownloadWithLineLimit(self):
+        p = sp.Popen("./ena download -n -l 10000 PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        stdout = stdout.decode()
+        self.assertTrue("| gzip -cd | head -n 10000 | gzip >" in stdout)
+
+    def testDownloadWithLineLimit(self):
+        p = sp.Popen("./ena download -d test_out -l 10000 SRR6676668 SRR6676669", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue(os.path.exists('test_out/SRR6676668_1.fastq.gz'))
+        self.assertTrue(os.path.exists('test_out/SRR6676668_2.fastq.gz'))
+        self.assertTrue(os.path.exists('test_out/SRR6676669_2.fastq.gz'))
+        self.assertTrue(os.path.exists('test_out/SRR6676669_2.fastq.gz'))
+        
+        f = gzip.open('test_out/SRR6676669_2.fastq.gz','rb')
+        fastq = f.readlines()
+        self.assertEqual(10000, len(fastq))
+
+    def testDownloadFail(self):
+        passed = False
+        try:
+            ena.download(url= 'ftp:foo/bar', dest_file= 'test_out/test.fq', n_lines= -1, dryrun= False)
+        except:
+            passed= True
+        self.assertTrue(passed)
+
+    def testCanSkipDownload(self):
+        shutil.copy('test/data/SRR1928148_1.fastq.gz', 'test_out/SRR1928148_1.fastq.gz')
+        shutil.copy('test/data/SRR1928148_2.fastq.gz', 'test_out/SRR1928148_2.fastq.gz')
+        ctime = os.stat('test_out/SRR1928148_2.fastq.gz').st_ctime
+
+        p = sp.Popen("./ena download -d test_out SRR1928148", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('found' in stderr.decode())
+        # We haven't overwritten the file
+        self.assertEqual(ctime, os.stat('test_out/SRR1928148_2.fastq.gz').st_ctime) 
+
+        # If using filters, do not check for size:
+        p = sp.Popen("./ena download -l 10000 -n -d test_out SRR1928148", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('found' not in stderr.decode())
+
+    def testMakeDownloadTable(self):
+        dat = ena.make_download_table('PRJNA433164', '')
+        
+
+if __name__ == '__main__':
+    unittest.main()
