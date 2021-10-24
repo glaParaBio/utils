@@ -32,6 +32,55 @@ class Test(unittest.TestCase):
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
 
+    def testInvalidRegex(self):
+        p = sp.Popen("./ena query -i '*'", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertNotEqual(0, p.returncode)
+        self.assertTrue('Traceback' not in stderr.decode())
+
+    def testNoColumnsSelected(self):
+        p = sp.Popen("./ena query -i FOO", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertNotEqual(0, p.returncode)
+        self.assertTrue('Traceback' not in stderr.decode())
+
+    def testQueryIncludesNonExistantAccessionID(self):
+        p = sp.Popen("./ena query FOOBAR SRR6676699 SRR6676698", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode) 
+        self.assertTrue('Traceback' not in stderr.decode())
+        self.assertTrue('FOOBAR' in stderr.decode())
+
+        # The table is returned anyway for the accessions that were found
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertEqual(2, len(table))
+
+    def testQueryOnlyNonExistantAccessionID(self):
+        p = sp.Popen("./ena query FOOBAR SPAM", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode)
+        self.assertTrue('Traceback' not in stderr.decode())
+        self.assertTrue('FOOBAR' in stderr.decode())
+        self.assertTrue('SPAM' in stderr.decode())
+        self.assertEqual('', stdout.decode().strip())
+
+    def testDownloadIncludesNonExistantAccessionID(self):
+        p = sp.Popen("./ena download -n FOOBAR SRR6676699 SRR6676698", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode) 
+        self.assertTrue('Traceback' not in stderr.decode())
+        self.assertTrue('FOOBAR' in stderr.decode())
+        self.assertTrue('curl' in stdout.decode())
+
+    def testDownloadOnlyNonExistantAccessionID(self):
+        p = sp.Popen("./ena download -n FOOBAR", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode) 
+        self.assertTrue('Traceback' not in stderr.decode())
+        self.assertTrue('FOOBAR' in stderr.decode())
+        self.assertTrue('curl' not in stdout.decode())
+
     def testCanGetDescriptionTable(self):
         p = sp.Popen("./ena query", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
         stdout, stderr = p.communicate()
@@ -56,10 +105,7 @@ class Test(unittest.TestCase):
         # Exclude comes after include: Exclude everything
         p = sp.Popen("./ena query -i '.*' -e '.*'", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
         stdout, stderr = p.communicate()
-        self.assertEqual(0, p.returncode)
-        txt = io.StringIO(stdout.decode())
-        table = pandas.read_csv(txt, sep='\t')
-        self.assertEqual(0, len(table.index))
+        self.assertEqual(1, p.returncode)
 
     def testPrintOnlySelectedColumns(self):
         p = sp.Popen("./ena query -i 'run_accession|sample_accession|sample_title' -e 'secondary' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
@@ -168,7 +214,13 @@ class Test(unittest.TestCase):
     def testPrefixFailsWithMissingColumn(self):
         p = sp.Popen("./ena query -p '{foo}' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
         stdout, stderr = p.communicate()
-        self.assertNotEqual(0, p.returncode)
+        self.assertEqual(1, p.returncode)
+        self.assertTrue('Traceback' not in stderr.decode())
+
+        p = sp.Popen("./ena download -n -p '{foo}' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode)
+        self.assertTrue('Traceback' not in stderr.decode())
 
     def testMarkdown(self):
         p = sp.Popen("./ena query -f markdown PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
@@ -219,11 +271,60 @@ class Test(unittest.TestCase):
         fastq = f.readlines()
         self.assertEqual(10000, len(fastq))
 
+    def testReadAccessionsFromFile(self):
+        p = sp.Popen("./ena query -a test/data/accessions.tsv", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(len(table) == 2)
+        self.assertTrue('SRR6676668' in list(table.run_accession))
+
+    def testReadAccessionsFromFileAndFromCommandArgs(self):
+        p = sp.Popen("./ena query -a test/data/accessions.tsv SRR6676670", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(len(table) == 3)
+        self.assertTrue('SRR6676668' in list(table.run_accession))
+        self.assertTrue('SRR6676670' in list(table.run_accession))
+
+    def testReadAccessionFileFromStdin(self):
+        p = sp.Popen("cat test/data/accessions.tsv | ./ena query -a - SRR6676670", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        
+        txt = io.StringIO(stdout.decode())
+        table = pandas.read_csv(txt, sep='\t')
+        self.assertTrue(len(table) == 3)
+        self.assertTrue('SRR6676668' in list(table.run_accession))
+        self.assertTrue('SRR6676670' in list(table.run_accession))
+
+    def testReadAccessionFileForDownload(self):
+        p = sp.Popen("./ena download -n -a test/data/accessions.tsv SRR6676670", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('curl' in stdout.decode() and 'SRR6676670' in stdout.decode() and 'SRR6676668' in stdout.decode())
+
+        p = sp.Popen("./ena download -n -a test/data/accessions.tsv", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('curl' in stdout.decode() and 'SRR6676668' in stdout.decode())
+
+    def testDownloadWithNoAccession(self):
+        p = sp.Popen("./ena download -n", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode)
+        self.assertTrue('Traceback' not in stderr.decode())
+
     def testDownloadFail(self):
         passed = False
         try:
-            ena.download(url= 'ftp:foo/bar', dest_file= 'test_out/test.fq', n_lines= -1, dryrun= False)
-        except:
+            ena.download(url= 'ftp:foo/bar', dest_file= 'test_out/test.fq', n_lines= -1, expected_bytes= 1000, dryrun= False, attempt= 1)
+        except ena.DownloadException:
             passed= True
         self.assertTrue(passed)
 
