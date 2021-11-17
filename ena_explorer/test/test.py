@@ -8,7 +8,7 @@ import subprocess as sp
 import pandas
 import io
 import gzip
-import importlib as imp
+import imp
 ena = imp.load_source('ena', './ena')
 
 class Test(unittest.TestCase):
@@ -230,6 +230,17 @@ class Test(unittest.TestCase):
         self.assertTrue('NA.foo' in stdout.decode())
         self.assertTrue('Warning' in stderr.decode())
 
+    def testAutomaticPrefix(self):
+        p = sp.Popen("./ena download -n -p AUTO PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('0h_R+_1.Plasmodium_berghei.RNA-Seq.' in stdout.decode())
+
+        p = sp.Popen("./ena download -n -p AUTO SAMN00255192", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('TOXOPLASMAGONDII-RL-01-705.Toxoplasma_gondii_ME49.WGS.' in stdout.decode())
+
     def testMarkdown(self):
         p = sp.Popen("./ena query -f markdown PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
         stdout, stderr = p.communicate()
@@ -265,6 +276,11 @@ class Test(unittest.TestCase):
         self.assertEqual(0, p.returncode)
         stdout = stdout.decode()
         self.assertTrue("| gzip -cd | head -n 10000 | gzip >" in stdout)
+
+    def testSingleDownload(self):
+        p = sp.Popen("./ena download -n SRX11083654", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
 
     def testDownloadWithLineLimit(self):
         p = sp.Popen("./ena download -d test_out -l 10000 SRR6676668 SRR6676669", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)

@@ -58,8 +58,8 @@ subparsers.required= True
 parser_query = subparsers.add_parser('query', help= query_help, description= query_help, formatter_class= argparse.RawDescriptionHelpFormatter)
 parser_download = subparsers.add_parser('download', help= download_help, description= download_help, formatter_class= argparse.RawDescriptionHelpFormatter)
 
-prefix_help = {'help': "Make filenames more informative by adding this prefix. Strings in curly braces will be replaced by the corresponding entry from the metadata table. E.g., '{sample_title}.{library_strategy}.' [%(default)s]",
-    'default': ''}
+prefix_help = {'help': "Add this prefix to filenames. Use curly braces to add the value from the metadata table. Use 'AUTO' for automatically building a nice prefix. E.g., '{sample_title}.{library_strategy}.' [%(default)s]",
+        'default': '', 'metavar': '[PREFIX|AUTO]'}
 
 accession_file_help = {'help': "Read accessions from this file, one accession per line. It can be a tabular file where the first column are accessions. Use - to read from stdin", 'default': None}
 
@@ -163,7 +163,39 @@ def get_table(accessions, fields, drop_empty, drop_invariant_cols, prefix= ''):
     query_results = {'results': results, 'accessions_not_found': accessions_not_found}
     return(query_results)
 
+def get_column(table, column):
+    if column in table.columns and not table[column].isnull().all():
+        x = list(table[column])
+    else:
+        x = None
+    return x
+
+def nice_prefix(table, name_candidates= ['library_name', 'sample_title', 'sample_alias'], 
+        extra= ['scientific_name', 'library_strategy'], sep= '.'):
+    """Use the metadata table to generate nice prefix to add to output
+    filenames
+    """
+    name = None
+    for x in name_candidates:
+        if get_column(table, x) is not None:
+            name = x
+            break
+    
+    prefix = ''
+    if name is not None:
+        prefix += '{' + name + '}'
+    for x in extra:
+        if get_column(table, x) is not None:
+            prefix += sep + '{' + x + '}'
+    prefix = prefix.lstrip(sep)
+    if prefix != '':
+        prefix += sep
+    return prefix
+
 def make_prefix(table, prefix):
+    if prefix == 'auto':
+        prefix = nice_prefix(table)
+        sys.stderr.write('Using prefix "%s"\n' % prefix)
     prefix_fmt = []
     for idx,row in table.iterrows():
         fmt = prefix
@@ -198,7 +230,7 @@ def make_download_table(accessions, prefix):
     fastq_bytes = []
     for idx,row in query_results['results'].iterrows():
         fastqs = row.fastq_ftp.split(';')
-        fq_bytes = row.fastq_bytes.split(';')
+        fq_bytes = str(row.fastq_bytes).split(';')
         for x,b in zip(fastqs, fq_bytes):
             ftp.append(x)
             fastq_bytes.append(int(b))
