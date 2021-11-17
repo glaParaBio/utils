@@ -170,10 +170,15 @@ def make_prefix(table, prefix):
         do_check = True
         for colname in table.columns:
             if '{' + colname + '}' in prefix:
-                value = row[colname] 
+                value = row[colname]
+                if pandas.isnull(value):
+                    value = 'NA'
+                    sys.stderr.write('Warning: ENA returns NA for some fields in prefix "%s"\n' % prefix)
+                else:
+                    value = str(row[colname])
                 if '{' in value and '}' in value:
                     do_check = False
-                fmt = fmt.replace('{' + colname + '}', row[colname])
+                fmt = fmt.replace('{' + colname + '}', value)
         if do_check and '{' in fmt and '}' in fmt:
             raise FormatException('Some fields could not be formatted for %s' % prefix)
         fmt = re.sub('\s', '_', fmt)
@@ -313,7 +318,12 @@ if __name__ == '__main__':
         if args.transpose is not None:
             results = transpose(results, args.transpose)
         if args.format == 'markdown':
-            print(results.to_markdown(index= False))
+            try:
+                print(results.to_markdown(index= False))
+            except ImportError as e:
+                if "Missing optional dependency 'tabulate'" in str(e):
+                    sys.stderr.write("Failed to output in 'markdown' format because the python package 'tabulate' is not available.\nUse pip or conda to install tabulate\n")
+                    sys.exit(1)
         elif args.format == 'tsv':
             csv = results.to_csv(None, sep= '\t', index= False)
             if not csv.endswith('\n'):

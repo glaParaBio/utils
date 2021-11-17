@@ -8,7 +8,7 @@ import subprocess as sp
 import pandas
 import io
 import gzip
-import imp
+import importlib as imp
 ena = imp.load_source('ena', './ena')
 
 class Test(unittest.TestCase):
@@ -187,7 +187,7 @@ class Test(unittest.TestCase):
         table = pandas.read_csv(txt, sep='\t')
         self.assertTrue(all([x.startswith('foo_') for x in table.prefix]))
 
-    def testSpaceReplacedInPrefix(self):
+    def testReplaceSpaceInPrefix(self):
         p = sp.Popen("./ena query -p '{run_accession} {scientific_name}.' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
@@ -221,6 +221,14 @@ class Test(unittest.TestCase):
         stdout, stderr = p.communicate()
         self.assertEqual(1, p.returncode)
         self.assertTrue('Traceback' not in stderr.decode())
+
+    def testPrefixWithNaNValue(self):
+        p = sp.Popen("./ena download -n -p '{library_name}.foo' PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('fastq' in stdout.decode())
+        self.assertTrue('NA.foo' in stdout.decode())
+        self.assertTrue('Warning' in stderr.decode())
 
     def testMarkdown(self):
         p = sp.Popen("./ena query -f markdown PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
