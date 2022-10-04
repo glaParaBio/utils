@@ -1,0 +1,60 @@
+##gff-version 3
+##species http://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=5823
+##sequence-region PbANKA_00_v3_archived_contig_1 1 56810
+##sequence-region PbANKA_00_v3_archived_contig_2 1 34265
+##sequence-region PbANKA_00_v3_archived_contig_3 1 24479
+##sequence-region PbANKA_00_v3_archived_contig_4 1 10286
+##sequence-region PbANKA_00_v3_archived_contig_5 1 6544
+##sequence-region PbANKA_01_v3 1 515659
+##sequence-region PbANKA_02_v3 1 622508
+##sequence-region PbANKA_03_v3 1 659512
+##sequence-region PbANKA_04_v3 1 712327
+##sequence-region PbANKA_05_v3 1 931174
+##sequence-region PbANKA_06_v3 1 984266
+##sequence-region PbANKA_07_v3 1 846620
+##sequence-region PbANKA_08_v3 1 1420537
+##sequence-region PbANKA_09_v3 1 1633586
+##sequence-region PbANKA_10_v3 1 1640193
+##sequence-region PbANKA_11_v3 1 1762642
+##sequence-region PbANKA_12_v3 1 1807262
+##sequence-region PbANKA_13_v3 1 2521873
+##sequence-region PbANKA_14_v3 1 2549703
+##sequence-region PbANKA_API_v3 1 34403
+##sequence-region PbANKA_MIT_v3 1 5957
+PbANKA_09_v3	VEuPathDB	protein_coding_gene	1175534	1176326	.	+	.	ID=PBANKA_0932200;description=peptidyl-prolyl cis-trans isomerase%2C putative;ebi_biotype=protein_coding
+PbANKA_09_v3	VEuPathDB	mRNA	1175534	1176326	.	+	.	ID=PBANKA_0932200.1;Parent=PBANKA_0932200;Note=5.2.1.8 (Peptidylprolyl isomerase);description=peptidyl-prolyl cis-trans isomerase%2C putative;gene_ebi_biotype=protein_coding
+PbANKA_09_v3	VEuPathDB	exon	1175534	1175545	.	+	.	ID=exon_PBANKA_0932200.1-E1;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200
+PbANKA_09_v3	VEuPathDB	exon	1175668	1175742	.	+	.	ID=exon_PBANKA_0932200.1-E2;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200
+PbANKA_09_v3	VEuPathDB	exon	1175835	1176326	.	+	.	ID=exon_PBANKA_0932200.1-E3;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200
+PbANKA_09_v3	VEuPathDB	CDS	1175534	1175545	.	+	0	ID=PBANKA_0932200.1-p1-CDS1;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200;protein_source_id=PBANKA_0932200.1-p1
+PbANKA_09_v3	VEuPathDB	CDS	1175668	1175742	.	+	0	ID=PBANKA_0932200.1-p1-CDS2;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200;protein_source_id=PBANKA_0932200.1-p1
+PbANKA_09_v3	VEuPathDB	CDS	1175835	1176326	.	+	0	ID=PBANKA_0932200.1-p1-CDS3;Parent=PBANKA_0932200.1;gene_id=PBANKA_0932200;protein_source_id=PBANKA_0932200.1-p1
+PbANKA_11_v3	VEuPathDB	protein_coding_gene	490401	492148	.	+	.	ID=PBANKA_1112300;Name=RAB1b;description=ras-related protein Rab-1B%2C putative;ebi_biotype=protein_coding
+PbANKA_11_v3	VEuPathDB	mRNA	490401	492148	.	+	.	ID=PBANKA_1112300.1;Parent=PBANKA_1112300;description=ras-related protein Rab-1B%2C putative;gene_ebi_biotype=protein_coding
+PbANKA_11_v3	VEuPathDB	exon	490401	490414	.	+	.	ID=exon_PBANKA_1112300.1-E1;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300
+PbANKA_11_v3	VEuPathDB	exon	490620	490692	.	+	.	ID=exon_PBANKA_1112300.1-E2;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300
+PbANKA_11_v3	VEuPathDB	exon	491120	491215	.	+	.	ID=exon_PBANKA_1112300.1-E3;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300
+PbANKA_11_v3	VEuPathDB	exon	491343	491406	.	+	.	ID=exon_PBANKA_1112300.1-E4;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300
+PbANKA_11_v3	VEuPathDB	exon	491579	491654	.	+	.	ID=exon_PBANKA_1112300.1-E5;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300
+PbANKA_11_v3	VEuPathDB	exon	491869	492148	.	+	.	ID=exon_PBANKA_1112300.1-E6;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300
+PbANKA_11_v3	VEuPathDB	CDS	490401	490414	.	+	0	ID=PBANKA_1112300.1-p1-CDS1;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300;protein_source_id=PBANKA_1112300.1-p1
+PbANKA_11_v3	VEuPathDB	CDS	490620	490692	.	+	1	ID=PBANKA_1112300.1-p1-CDS2;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300;protein_source_id=PBANKA_1112300.1-p1
+PbANKA_11_v3	VEuPathDB	CDS	491120	491215	.	+	0	ID=PBANKA_1112300.1-p1-CDS3;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300;protein_source_id=PBANKA_1112300.1-p1
+PbANKA_11_v3	VEuPathDB	CDS	491343	491406	.	+	0	ID=PBANKA_1112300.1-p1-CDS4;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300;protein_source_id=PBANKA_1112300.1-p1
+PbANKA_11_v3	VEuPathDB	CDS	491579	491654	.	+	2	ID=PBANKA_1112300.1-p1-CDS5;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300;protein_source_id=PBANKA_1112300.1-p1
+PbANKA_11_v3	VEuPathDB	CDS	491869	492148	.	+	1	ID=PBANKA_1112300.1-p1-CDS6;Parent=PBANKA_1112300.1;gene_id=PBANKA_1112300;protein_source_id=PBANKA_1112300.1-p1
+PbANKA_08_v3	VEuPathDB	protein_coding_gene	1221774	1223417	.	+	.	ID=PBANKA_0832100;description=conserved Plasmodium protein%2C unknown function;ebi_biotype=protein_coding
+PbANKA_08_v3	VEuPathDB	mRNA	1221774	1223417	.	+	.	ID=PBANKA_0832100.1;Parent=PBANKA_0832100;description=conserved Plasmodium protein%2C unknown function;gene_ebi_biotype=protein_coding
+PbANKA_08_v3	VEuPathDB	exon	1221774	1223417	.	+	.	ID=exon_PBANKA_0832100.1-E1;Parent=PBANKA_0832100.1;gene_id=PBANKA_0832100
+PbANKA_08_v3	VEuPathDB	CDS	1221774	1223417	.	+	0	ID=PBANKA_0832100.1-p1-CDS1;Parent=PBANKA_0832100.1;gene_id=PBANKA_0832100;protein_source_id=PBANKA_0832100.1-p1
+PbANKA_13_v3	VEuPathDB	protein_coding_gene	367598	368559	.	-	.	ID=PBANKA_1307600;Name=DPCK;description=dephospho-CoA kinase%2C putative;ebi_biotype=protein_coding
+PbANKA_13_v3	VEuPathDB	mRNA	367598	368559	.	-	.	ID=PBANKA_1307600.1;Parent=PBANKA_1307600;Note=2.7.1.24 (Dephospho-CoA kinase);description=dephospho-CoA kinase%2C putative;gene_ebi_biotype=protein_coding
+PbANKA_13_v3	VEuPathDB	exon	367598	367727	.	-	.	ID=exon_PBANKA_1307600.1-E2;Parent=PBANKA_1307600.1;gene_id=PBANKA_1307600
+PbANKA_13_v3	VEuPathDB	exon	367865	368559	.	-	.	ID=exon_PBANKA_1307600.1-E1;Parent=PBANKA_1307600.1;gene_id=PBANKA_1307600
+PbANKA_13_v3	VEuPathDB	CDS	367598	367727	.	-	1	ID=PBANKA_1307600.1-p1-CDS2;Parent=PBANKA_1307600.1;gene_id=PBANKA_1307600;protein_source_id=PBANKA_1307600.1-p1
+PbANKA_13_v3	VEuPathDB	CDS	367865	368559	.	-	0	ID=PBANKA_1307600.1-p1-CDS1;Parent=PBANKA_1307600.1;gene_id=PBANKA_1307600;protein_source_id=PBANKA_1307600.1-p1
+PbANKA_08_v3	VEuPathDB	protein_coding_gene	731447	733129	.	-	.	ID=PBANKA_0818100;Name=OGG1;description=N-glycosylase/DNA lyase%2C putative;ebi_biotype=protein_coding
+PbANKA_08_v3	VEuPathDB	mRNA	731447	733129	.	-	.	ID=PBANKA_0818100.1;Parent=PBANKA_0818100;Note=3.2.2.- (Hydrolyzing N-glycosyl compounds.)%3B4.2.99.18 (DNA-(apurinic or apyrimidinic site) lyase);description=N-glycosylase/DNA lyase%2C putative;gene_ebi_biotype=protein_coding
+PbANKA_08_v3	VEuPathDB	exon	731447	733129	.	-	.	ID=exon_PBANKA_0818100.1-E1;Parent=PBANKA_0818100.1;gene_id=PBANKA_0818100
+PbANKA_08_v3	VEuPathDB	CDS	731447	733129	.	-	0	ID=PBANKA_0818100.1-p1-CDS1;Parent=PBANKA_0818100.1;gene_id=PBANKA_0818100;protein_source_id=PBANKA_0818100.1-p1
+PbANKA_13_v3	VEuPathDB	protein_coding_gene	1220891	1221968	.	+	.	ID=PBANKA_1329900;description=conserved Plasmodium protein%2C unknown function;ebi_biotype=protein_coding
