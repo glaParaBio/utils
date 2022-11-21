@@ -8,8 +8,14 @@ import subprocess as sp
 import pandas
 import io
 import gzip
-import imp
-ena = imp.load_source('ena', './ena')
+
+if sys.version_info[:2] <= (3, 4):
+    import imp
+    ena = imp.load_source('ena', './ena')
+else:
+    from importlib.machinery import SourceFileLoader
+    ena = SourceFileLoader('ena', './ena').load_module()
+
 
 class Test(unittest.TestCase):
 
@@ -347,7 +353,7 @@ class Test(unittest.TestCase):
     def testDownloadFail(self):
         passed = False
         try:
-            ena.download(url= 'ftp:foo/bar', dest_file= 'test_out/test.fq', n_lines= -1, expected_bytes= 1000, dryrun= False, attempt= 1)
+            ena.download(url= 'ftp:foo/bar', dest_file= 'test_out/test.fq', n_lines= -1, expected_bytes= 1000, dryrun= False, attempt= 1, force_download= False)
         except ena.DownloadException:
             passed= True
         self.assertTrue(passed)
@@ -366,6 +372,12 @@ class Test(unittest.TestCase):
 
         # If using filters, do not check for size:
         p = sp.Popen("./ena download -l 10000 -n -d test_out SRR1928148", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('found' not in stderr.decode())
+
+        # Force download:
+        p = sp.Popen("./ena download -f -n -d test_out SRR1928148", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
         self.assertTrue('found' not in stderr.decode())
