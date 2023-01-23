@@ -50,7 +50,7 @@ Only download the first n lines
 '''
 
 parser = argparse.ArgumentParser(description= 'Query for accessions and download fastq files from ENA', formatter_class= argparse.RawTextHelpFormatter)
-parser.add_argument('--version', '-v', action='version', version='%(prog)s 0.2.0')
+parser.add_argument('--version', '-v', action='version', version='%(prog)s 0.3.0')
 
 subparsers = parser.add_subparsers(help='', dest= 'subcommand')
 subparsers.required= True
@@ -161,6 +161,9 @@ def get_table(accessions, fields, drop_empty, drop_invariant_cols, prefix= ''):
                 results.drop(x, axis= 1, inplace= True)
 
     results.drop_duplicates(inplace= True)
+    for x in ['read_count', 'base_count', 'fastq_bytes', 'sra_bytes']:
+        if x in results.columns and results[x].dtypes == 'float64':
+            results[x] = results[x].astype('Int64')
     query_results = {'results': results, 'accessions_not_found': accessions_not_found}
     return(query_results)
 
@@ -230,6 +233,8 @@ def make_download_table(accessions, prefix):
     dest_file = []
     fastq_bytes = []
     for idx,row in query_results['results'].iterrows():
+        if pandas.isna(row.fastq_ftp):
+            continue
         fastqs = row.fastq_ftp.split(';')
         fq_bytes = str(row.fastq_bytes).split(';')
         for x,b in zip(fastqs, fq_bytes):

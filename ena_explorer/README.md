@@ -3,6 +3,7 @@
 * [Requirements & Installation](#requirements--installation)
 * [Usage](#usage)
     * [The `query` command](#the-query-command)
+* [Changelog](#changelog)
 
 <!-- vim-markdown-toc -->
 
@@ -85,3 +86,7 @@ ena query -f markdown -i 'run_accession|sample_title|fastq_ftp|read_count' PRJNA
 | SRR6676678      |      4493715 | ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676678/SRR6676678_1.fastq.gz;ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676678/SRR6676678_2.fastq.gz | 12h_R-_2       |
 ...Etc
 ```
+
+# Changelog
+
+* **v0.3.0** Handle accession with no fastq files (e.g. SRX4952567) 

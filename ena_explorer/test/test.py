@@ -384,7 +384,13 @@ class Test(unittest.TestCase):
 
     def testMakeDownloadTable(self):
         dat = ena.make_download_table('PRJNA433164', '')
-        
+
+    def testMakeDownloadTableWithNan(self):
+        dat = ena.make_download_table('SRX4952567', '')
+        table = dat['table']
+        self.assertEqual(1, len(table))
+        self.assertEqual('int64', table['fastq_bytes'].dtypes)
+
 
 if __name__ == '__main__':
     unittest.main()
