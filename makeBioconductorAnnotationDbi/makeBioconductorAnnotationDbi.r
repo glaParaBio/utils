@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library(data.table))
 suppressPackageStartupMessages(library(AnnotationForge))
 suppressPackageStartupMessages(library(GO.db))
 
-VERSION = '0.1.0'
+VERSION = '0.2.0'
 
 get_command_call <- function() {
     cmdArgs <- commandArgs(trailingOnly = FALSE)
@@ -51,7 +51,9 @@ delete_existing_package <- function(path) {
 } 
 
 autodetect_genes <- function(gff, include) {
-    # Filter gff table to extract likely genes
+    # Filter gff table to extract likely genes. We use column FEATURE_TYPE (3rd
+    # column) to guess genes and we augment it with any gene in the `include` vector. 
+    # Typically, `include` is the list of genes from the GAF file
     stopifnot(c('ID', 'FEATURE_TYPE') %in% names(gff))
     KEEP_FEATURES <- c('gene', 'pseudogene', 'ncRNA_gene', 'protein_coding_gene') 
     features <- which(gff$FEATURE_TYPE %in% KEEP_FEATURES)
@@ -110,7 +112,9 @@ attributes_to_table <- function(gff_attr, keep='ALL') {
     keys <- keys[keys %in% keep]
     attr_dt <- list()
     for(x in keys) {
-        attr_dt[[x]] <- URLdecode(get_gff_attribute(gff_attr, x, na_value='n/a'))
+        raw <- get_gff_attribute(gff_attr, x, na_value='n/a')
+        decoded <- sapply(raw, URLdecode, USE.NAMES=FALSE)
+        attr_dt[[x]] <- decoded
     }
     attr_dt <- as.data.table(attr_dt)
     return(attr_dt)
@@ -147,6 +151,19 @@ edit_package_description <- function(description_file, cmdCall, version) {
     writeLines(content, description_file)
 }
 
+is_validate_name_for_package <- function(name) {
+    # From https://cran.r-project.org/doc/manuals/r-devel/R-exts.html#Creating-R-packages:
+    #
+    # The mandatory ‘Package’ field gives the name of the package. This should
+    # contain only (ASCII) letters, numbers and dot, have at least two
+    # characters and start with a letter and not end in a dot. 
+    # 
+    # We need to check that species and genus contain only numbers, letters, and
+    # dots. Check on length, start, and end of name are not necessary since the
+    # package will always start with 'org.' and end in '.db'
+    is_valid <- !grepl("[^A-Za-z0-9.]", name)
+    return(is_valid)
+}
 
 parser <- ArgumentParser(description='Prepare a Bioconductor annotationDbi (i.e. a package like org.Hs.eg.db) given a GFF file and a GAF file of gene IDs and associated GO terms')
 parser$add_argument('--gff', help='GFF local file or URL [required]', required=TRUE)
@@ -159,7 +176,7 @@ parser$add_argument('--outdir', '-o', help='Output directory [%(default)s]', def
 parser$add_argument('--maintainer', '-m', help='Maintainer name and email in format "Some One <so@someplace.org>" [%(default)s]', default='NA <na@na.com>')
 parser$add_argument('--author', '-a', help='Name and address of the author [%(default)s]', default='n/a')
 parser$add_argument('--feature-types', '-f', help='Use GFF records where the feature type (i.e. column 3) is in this list. Use AUTO to autodetect [%(default)s]', nargs='+', default='AUTO')
-parser$add_argument('--attributes', '-A', help='Include these GFF attributese. Use ALL to include all of them [%(default)s]', nargs='*', default='ALL')
+parser$add_argument('--attributes', '-A', help='Include these GFF attributes. Use ALL to include all of them [%(default)s]', nargs='*', default='ALL')
 def <- c(2, 5, 7)
 parser$add_argument('--gaf-column-idx', '-x', help=sprintf('Index of columns in GAF input for, respectively: GID, GO, EVIDENCE [%s]', paste(def, collapse=' ')), nargs=3, default=def, type='integer')
 parser$add_argument('--install', '-I', action='store_true', help='If set, also install the package in the default R library')
@@ -169,6 +186,13 @@ if(sys.nframe() == 0){
     # Script is being executed from the command line
 
     xargs <- parser$parse_args()
+
+    for(x in c(xargs$genus, xargs$species)) {
+        if(is_validate_name_for_package(x) == FALSE) {
+            write(sprintf('\nInvalid name: "%s"\nGenus and species name can contain only letters, numbers, and dots\n', x), stderr())
+            quit(status=1)
+        }
+    }
 
     idx <- xargs$gaf_column_idx
     names(idx) <- c('GID', 'GO', 'EVIDENCE')

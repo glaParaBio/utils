@@ -36,6 +36,18 @@ class TestMakeDb(unittest.TestCase):
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
 
+    def testValidateNames(self):
+        cmd = r"""./makeBioconductorAnnotationDbi.r \
+                    --gff test/data/PlasmoDB-59_PbergheiANKA.gff.gz \
+                    --gaf test/data/PlasmoDB-59_PbergheiANKA_GO.gaf.gz \
+                    -g Plasmodium_bar \
+                    -s testBergheiANKA
+                """
+        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(1, p.returncode)
+        self.assertTrue('Invalid name' in stderr.decode())
+
     def testMakeFromLocalGzFiles(self):
         cmd = r"""./makeBioconductorAnnotationDbi.r --gff test/data/PlasmoDB-59_PbergheiANKA.gff.gz \
                 --gaf test/data/PlasmoDB-59_PbergheiANKA_GO.gaf.gz \

@@ -1,6 +1,6 @@
 r-argparse
 r-data.table
-bioconductor-annotationforge
+bioconductor-annotationforge >=1.36.0
 bioconductor-go.db
 
 # Only for development & testing

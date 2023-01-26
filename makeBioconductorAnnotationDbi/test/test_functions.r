@@ -4,6 +4,16 @@ context("Test functions")
 
 source('../makeBioconductorAnnotationDbi.r')
 
+test_that("Can validate species and genus names to fit package name", {
+    expect_true(is_validate_name_for_package('FOO'))
+    expect_true(is_validate_name_for_package('foo'))
+    expect_true(is_validate_name_for_package('foo.0123456789.eggs'))
+    expect_true(is_validate_name_for_package(''))
+    expect_false(is_validate_name_for_package('foo_spam'))
+    expect_false(is_validate_name_for_package('foo%spam'))
+    expect_false(is_validate_name_for_package('foo-spam'))
+})
+
 test_that("Can convert GFF to dbi table", {
     STANDARD_COLUMNS <- c('GID', 'FEATURE_TYPE', 'CHROM', 'GID_START', 'GID_END', 'GID_STRAND')
 
@@ -58,3 +68,40 @@ test_that("Can autodetect genes", {
     expect_true('exon_PBANKA_1112300.1-E1' %in% dbi$GID)
     expect_true('exon_PBANKA_0832100.1-E1' %in% dbi$GID)
 })
+
+test_that("Can autodetect genes", {
+    dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids=NULL)
+    expect_equal(dbi$FEATURE_TYPE, rep('protein_coding_gene', 6))
+    expect_true('PBANKA_1307600' %in% dbi$GID)
+    
+    dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids='exon_PBANKA_1112300.1-E1')
+    expect_true('PBANKA_1307600' %in% dbi$GID)
+    expect_true('exon_PBANKA_1112300.1-E1' %in% dbi$GID)
+
+    dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids=c('exon_PBANKA_1112300.1-E1', 'exon_PBANKA_0832100.1-E1', 'FOOBAR'))
+    expect_true('PBANKA_1307600' %in% dbi$GID)
+    expect_true('exon_PBANKA_1112300.1-E1' %in% dbi$GID)
+    expect_true('exon_PBANKA_0832100.1-E1' %in% dbi$GID)
+})
+
+test_that("Fake GFF file", {
+    dbi <- gff_to_dbitable('data/fake.gff', 'gene')
+    expect_equal(dbi$FEATURE_TYPE, rep('gene', 6))
+    expect_true('PBANKA_1307600' %in% dbi$GID)
+    expect_equal(dbi$CHROM, rep('n/a', 6))
+})
+
+# test_that("GFF with no ID attribute", {
+#     dbi <- gff_to_dbitable('data/shorti_noid.gff', 'AUTO', '', include_ids=NULL)
+#     expect_equal(dbi$FEATURE_TYPE, rep('protein_coding_gene', 6))
+#     expect_true('PBANKA_1307600' %in% dbi$GID)
+#     
+#     dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids='exon_PBANKA_1112300.1-E1')
+#     expect_true('PBANKA_1307600' %in% dbi$GID)
+#     expect_true('exon_PBANKA_1112300.1-E1' %in% dbi$GID)
+# 
+#     dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids=c('exon_PBANKA_1112300.1-E1', 'exon_PBANKA_0832100.1-E1', 'FOOBAR'))
+#     expect_true('PBANKA_1307600' %in% dbi$GID)
+#     expect_true('exon_PBANKA_1112300.1-E1' %in% dbi$GID)
+#     expect_true('exon_PBANKA_0832100.1-E1' %in% dbi$GID)
+# })
