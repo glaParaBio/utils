@@ -9,7 +9,7 @@
 # Description
 
 `pafplot.R` plots alignments in
-[paf](https://github.com/lh3/miniasm/blob/master/PAF.md). Typical use case: You
+[paf](https://github.com/lh3/miniasm/blob/master/PAF.md) format. Typical use case: You
 have two assemblies from the same species or related species and you want to
 visualize how these assemblies map to each other.
 
