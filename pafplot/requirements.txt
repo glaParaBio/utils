@@ -1,0 +1,5 @@
+r-data.table =1.12.2
+r-r.utils
+r-ggplot2 =3.2.1
+r-argparse =2.0.1 
+r-ggforce =0.3.1
