@@ -8,6 +8,11 @@
 
 # Description
 
+`pafplot.R` plots alignments in
+[paf](https://github.com/lh3/miniasm/blob/master/PAF.md). Typical use case: You
+have two assemblies from the same species or related species and you want to
+visualize how these assemblies map to each other.
+
 Help from `./pafplot.R -h` (printout here may be outdated):
 
 ```
@@ -65,6 +70,12 @@ See [example.pdf](test_data/example.pdf), which you should be able to reproduce 
 ```
 zcat test_data/aln.paf.gz | ./pafplot.R -i - -o example.pdf
 ```
+
+For each query sequence (contig) in `aln.paf`, show which reference contigs map
+to it after applying some filters. E.g. query contig `tig00000002` contains
+reference contig `Chr10_3B_Tb427v10` and some large chunks of
+`Chr10_core_Tb427v10`. The header of each panel has some information about the
+overall alignments of each query contig. 
 
 # Setup
 
