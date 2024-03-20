@@ -8,6 +8,7 @@ import io
 import sys
 import re
 import os
+import urllib.parse
 
 query_help = '''\
 Return the metadata table for accession IDs or\nreturn the table of all available metadata
@@ -50,7 +51,7 @@ Only download the first n lines
 '''
 
 parser = argparse.ArgumentParser(description= 'Query for accessions and download fastq files from ENA', formatter_class= argparse.RawTextHelpFormatter)
-parser.add_argument('--version', '-v', action='version', version='%(prog)s 0.3.0')
+parser.add_argument('--version', '-v', action='version', version='%(prog)s 0.4.0')
 
 subparsers = parser.add_subparsers(help='', dest= 'subcommand')
 subparsers.required= True
@@ -75,6 +76,7 @@ parser_query.add_argument('--drop-invariant-cols', '-D', help= 'Drop columns wit
 parser_download.add_argument('accessions', help= 'List of accession IDs', nargs= '*')
 parser_download.add_argument('--accession-file', '-a', **accession_file_help)
 parser_download.add_argument('--prefix', '-p', **prefix_help)
+parser_download.add_argument('--url-col', '-c', help= 'Get download URLs from this column [%(default)s]', default= 'fastq_ftp', choices=['fastq_ftp', 'submitted_ftp'])
 parser_download.add_argument('--outdir', '-d', help= 'Change to this output directory before downloading [%(default)s]', default= '.')
 parser_download.add_argument('--n-lines', '-l', help= 'Download up to this many lines per file, no limit if <= 0 [%(default)s]', default= -1, type= int)
 parser_download.add_argument('--force-download', '-f', help= 'Force download even if file exists and it has the expected size', action= 'store_true')
@@ -161,7 +163,7 @@ def get_table(accessions, fields, drop_empty, drop_invariant_cols, prefix= ''):
                 results.drop(x, axis= 1, inplace= True)
 
     results.drop_duplicates(inplace= True)
-    for x in ['read_count', 'base_count', 'fastq_bytes', 'sra_bytes']:
+    for x in ['read_count', 'base_count', 'fastq_bytes', 'submitted_bytes', 'sra_bytes']:
         if x in results.columns and results[x].dtypes == 'float64':
             results[x] = results[x].astype('Int64')
     query_results = {'results': results, 'accessions_not_found': accessions_not_found}
@@ -217,7 +219,7 @@ def make_prefix(table, prefix):
                 fmt = fmt.replace('{' + colname + '}', value)
         if do_check and '{' in fmt and '}' in fmt:
             raise FormatException('Some fields could not be formatted for %s' % prefix)
-        fmt = re.sub('\s', '_', fmt)
+        fmt = re.sub(r'\s', '_', fmt)
         fmt = fmt.replace('/', '_')
         fmt = fmt.replace('\\', '_')
         fmt = fmt.replace("'", '"')
@@ -226,23 +228,31 @@ def make_prefix(table, prefix):
         prefix_fmt.append(fmt)
     return prefix_fmt
 
-def make_download_table(accessions, prefix):
+def make_download_table(accessions, prefix, url_col='fastq_ftp'):
     fields = get_available_fields().columnId
     query_results = get_table(accessions, fields, prefix=prefix, drop_empty= False, drop_invariant_cols= False)
+    if url_col not in query_results['results'].columns:
+        raise DownloadException(f'Column {url_col} is not valid')
+    if url_col == 'fastq_ftp':
+        bytes_col = 'fastq_bytes'
+    elif url_col == 'submitted_ftp':
+        bytes_col = 'submitted_bytes'
+    else:
+        raise DownloadException(f'Column {url_col} is not valid')
     ftp = []
     dest_file = []
-    fastq_bytes = []
+    bytes = []
     for idx,row in query_results['results'].iterrows():
-        if pandas.isna(row.fastq_ftp):
+        if pandas.isna(row[url_col]):
             continue
-        fastqs = row.fastq_ftp.split(';')
-        fq_bytes = str(row.fastq_bytes).split(';')
+        fastqs = row[url_col].split(';')
+        fq_bytes = str(row[bytes_col]).split(';')
         for x,b in zip(fastqs, fq_bytes):
-            ftp.append(x)
-            fastq_bytes.append(int(b))
+            ftp.append(urllib.parse.quote(x))
+            bytes.append(int(b))
             fn = row.prefix + os.path.basename(x)
             dest_file.append(fn)
-    ftp = pandas.DataFrame({'fastq_ftp':ftp, 'dest_file': dest_file, 'fastq_bytes': fastq_bytes})
+    ftp = pandas.DataFrame({'fastq_ftp':ftp, 'dest_file': dest_file, 'bytes': bytes})
     assert len(list(ftp.dest_file)) == len(set(ftp.dest_file))
     return {'table': ftp, 'accessions_not_found': query_results['accessions_not_found']}
 
@@ -286,7 +296,7 @@ def download(url, dest_file, n_lines, dryrun, expected_bytes, attempt, force_dow
         file_found = True
         sys.stderr.write('File %s found - download skipped\n' % dest_file)
 
-    cmd = "curl {silent}-L {fastq_ftp} {head}> '{dest_file}'".format(silent= silent, head= head, fastq_ftp= url, dest_file= dest_file)
+    cmd = "curl --fail {silent}-L {fastq_ftp} {head}> '{dest_file}'".format(silent= silent, head= head, fastq_ftp= url, dest_file= dest_file)
     if '|' in cmd:
         cmd = 'set -o pipefail && ' + cmd
 
@@ -315,7 +325,7 @@ def read_accession_file(accession_file):
     else:
         with open(accession_file) as fin:
             txt = fin.readlines()
-    accessions = [re.sub(',.*|\t.*', '', x.strip()) for x in txt]
+    accessions = [re.sub(r',.*|\t.*', '', x.strip()) for x in txt]
     accessions = [x for x in accessions if x != '']
     return accessions
 
@@ -376,7 +386,7 @@ if __name__ == '__main__':
             sys.stderr.write('download sub-command needs at least one accession\n')
             sys.exit(1)
         try:
-            download_table = make_download_table(accessions, prefix= args.prefix)
+            download_table = make_download_table(accessions, prefix= args.prefix, url_col=args.url_col)
         except FormatException:
             sys.stderr.write('Prefix "%s" cannot be formatted\n' % args.prefix)
             sys.exit(1)
@@ -387,7 +397,7 @@ if __name__ == '__main__':
         os.chdir(args.outdir)
         
         for idx,row in download_table['table'].iterrows():
-            cmd = download(row.fastq_ftp, row.dest_file, args.n_lines, args.dryrun, row.fastq_bytes, attempt= 1, force_download= args.force_download)
+            cmd = download(row.fastq_ftp, row.dest_file, args.n_lines, args.dryrun, row.bytes, attempt= 1, force_download= args.force_download)
         if len(download_table['accessions_not_found']) == 0:
             sys.exit(0)
         else:

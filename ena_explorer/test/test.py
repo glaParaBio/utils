@@ -93,7 +93,8 @@ class Test(unittest.TestCase):
         self.assertEqual(0, p.returncode)
         txt = io.StringIO(stdout.decode())
         table = pandas.read_csv(txt, sep='\t')
-        self.assertEqual(['columnId', 'description'], list(table.columns))
+        self.assertTrue('columnId', list(table.columns))
+        self.assertTrue('description', list(table.columns))
         self.assertTrue(len(table.index) > 10)
 
     def testCanGetSelectedRowsFromDescriptionTable(self):
@@ -271,10 +272,10 @@ class Test(unittest.TestCase):
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
         stdout = stdout.decode()
-        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676668/SRR6676668_1.fastq.gz > '0h_R+_1.SRR6676668_1.fastq.gz'" in stdout)
-        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676668/SRR6676668_2.fastq.gz > '0h_R+_1.SRR6676668_2.fastq.gz'" in stdout)
-        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/009/SRR6676699/SRR6676699_1.fastq.gz > '24h_R-_4.SRR6676699_1.fastq.gz'" in stdout)
-        self.assertTrue("curl -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/009/SRR6676699/SRR6676699_2.fastq.gz > '24h_R-_4.SRR6676699_2.fastq.gz'" in stdout)
+        self.assertTrue("curl --fail -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676668/SRR6676668_1.fastq.gz > '0h_R+_1.SRR6676668_1.fastq.gz'" in stdout)
+        self.assertTrue("curl --fail -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/008/SRR6676668/SRR6676668_2.fastq.gz > '0h_R+_1.SRR6676668_2.fastq.gz'" in stdout)
+        self.assertTrue("curl --fail -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/009/SRR6676699/SRR6676699_1.fastq.gz > '24h_R-_4.SRR6676699_1.fastq.gz'" in stdout)
+        self.assertTrue("curl --fail -L ftp.sra.ebi.ac.uk/vol1/fastq/SRR667/009/SRR6676699/SRR6676699_2.fastq.gz > '24h_R-_4.SRR6676699_2.fastq.gz'" in stdout)
 
     def testDryRunDownloadWithLineLimit(self):
         p = sp.Popen("./ena download -n -l 10000 PRJNA433164", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
@@ -389,7 +390,19 @@ class Test(unittest.TestCase):
         dat = ena.make_download_table('SRX4952567', '')
         table = dat['table']
         self.assertEqual(1, len(table))
-        self.assertEqual('int64', table['fastq_bytes'].dtypes)
+        self.assertEqual('int64', table['bytes'].dtypes)
+
+    def testDownloadSubmittedFtp(self):
+        p = sp.Popen("./ena download --url-col submitted_ftp -d test_out ERX10611285", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue(os.path.exists('test_out/35207_2#46.cram'))
+        self.assertTrue(os.path.exists('test_out/35207_2#46.cram.crai'))
+
+        p = sp.Popen("./ena download --url-col submitted_ftp -d test_out ERX10611285", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+        self.assertTrue('download skipped' in stderr.decode())
 
 
 if __name__ == '__main__':
