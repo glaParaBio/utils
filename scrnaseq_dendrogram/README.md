@@ -1,3 +1,5 @@
+# Dendrogram of single-cells clusters
+
 <!-- vim-markdown-toc GFM -->
 
 * [Setup](#setup)
