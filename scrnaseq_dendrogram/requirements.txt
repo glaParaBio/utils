@@ -1,0 +1,5 @@
+r-data.table =1.15.2
+r-dendextend =1.17.1
+r-seurat =5.0.3
+r-ggbeeswarm =0.7.2
+r-svglite
