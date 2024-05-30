@@ -12,6 +12,14 @@ archive](https://www.ebi.ac.uk/ena/browser/home) and download fastq files.
 
 # Requirements & Installation
 
+```
+curl -O https://raw.githubusercontent.com/glaParaBio/utils/master/ena_explorer/ena
+chmod a+x ena
+
+# Move to a directory on your PATH, e.g.
+mv ena ~/bin
+```
+
 `ena` is a single python script depending only on
 [pandas](https://pandas.pydata.org/).
 [Install](https://pandas.pydata.org/docs/getting_started/install.html) pandas
