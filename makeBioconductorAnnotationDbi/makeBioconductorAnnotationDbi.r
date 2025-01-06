@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library(data.table))
 suppressPackageStartupMessages(library(AnnotationForge))
 suppressPackageStartupMessages(library(GO.db))
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 
 get_command_call <- function() {
     cmdArgs <- commandArgs(trailingOnly = FALSE)
@@ -20,13 +20,18 @@ get_command_call <- function() {
 
 reader <- function(fileOrUrl, ...) {
     options(warn=2)
+    isGzip <- grepl('*.gz$', fileOrUrl)
+    if (isGzip == TRUE) {
+        stream <- 'gzip -cd'
+    } else {
+        stream <- 'cat'
+    }
+
     grepcmd <- "awk '{if($0 ~ /^##FASTA/) {exit 0} else {print $0}}' | grep -v -P '^#|^!gaf-version'"
     if(grepl('^http', fileOrUrl) == TRUE) {
-        cmd <- sprintf('curl -s -L %s | %s', fileOrUrl, grepcmd)
-    } else if(grepl('*.gz$', fileOrUrl) == TRUE) {
-        cmd <- sprintf('gzip -cd %s | %s', fileOrUrl, grepcmd) 
+        cmd <- sprintf('curl -s -L %s | %s | %s', fileOrUrl, stream, grepcmd)
     } else {
-        cmd <- sprintf("cat %s | %s", fileOrUrl,  grepcmd)
+        cmd <- sprintf('%s %s | %s', stream, fileOrUrl, grepcmd)
     }
     ff <- fread(cmd=cmd, ...)
     options(warn=0)
@@ -38,7 +43,7 @@ get_package_name <- function(outdir, genus, species) {
     pkg <- sprintf('org.%s%s.eg.db', g, species)
     path <- file.path(outdir, pkg)
     return(path)
-} 
+}
 
 delete_existing_package <- function(path) {
     if(file.exists(path) == TRUE) {
@@ -48,14 +53,14 @@ delete_existing_package <- function(path) {
         xcode <- system(sprintf('rm -r %s', path))
         options(warn=0)
     }
-} 
+}
 
 autodetect_genes <- function(gff, include) {
     # Filter gff table to extract likely genes. We use column FEATURE_TYPE (3rd
-    # column) to guess genes and we augment it with any gene in the `include` vector. 
+    # column) to guess genes and we augment it with any gene in the `include` vector.
     # Typically, `include` is the list of genes from the GAF file
     stopifnot(c('ID', 'FEATURE_TYPE') %in% names(gff))
-    KEEP_FEATURES <- c('gene', 'pseudogene', 'ncRNA_gene', 'protein_coding_gene') 
+    KEEP_FEATURES <- c('gene', 'pseudogene', 'ncRNA_gene', 'protein_coding_gene')
     features <- which(gff$FEATURE_TYPE %in% KEEP_FEATURES)
     extra <- which(gff$ID %in% include)
     keep <- sort(unique(c(features, extra)))
@@ -95,10 +100,10 @@ gff_to_dbitable <- function(gff_file, feature_types='AUTO', keep_attributes='ALL
 
 attributes_to_table <- function(gff_attr, keep='ALL') {
     # Convert the vector of GFF attributes (column 9 in GFF) to data.table
-    if(is.na(keep) || is.null(keep) || length(keep) == 0 || keep == '') {
+    if(all(is.na(keep)) || all(is.null(keep)) || length(keep) == 0 || all(keep == '')) {
         keep <- 'ID'
     }
-    
+
     keys <- unlist(strsplit(gff_attr, ';'))
     keys <- unique(sapply(keys, function(x) strsplit(x, '=')[[1]][1], USE.NAMES=FALSE))
     if(length(keep) == 1 && keep == 'ALL') {
@@ -156,8 +161,8 @@ is_validate_name_for_package <- function(name) {
     #
     # The mandatory ‘Package’ field gives the name of the package. This should
     # contain only (ASCII) letters, numbers and dot, have at least two
-    # characters and start with a letter and not end in a dot. 
-    # 
+    # characters and start with a letter and not end in a dot.
+    #
     # We need to check that species and genus contain only numbers, letters, and
     # dots. Check on length, start, and end of name are not necessary since the
     # package will always start with 'org.' and end in '.db'
@@ -207,7 +212,7 @@ if(sys.nframe() == 0){
     delete_existing_package(pkg_name)
 
     dir.create(xargs$outdir, showWarnings=FALSE, recursive=TRUE)
-    
+
     sink(stderr(), type = "output")
     suppressMessages(
     name <- makeOrgPackage(gene_info=gff, go=gaf,
