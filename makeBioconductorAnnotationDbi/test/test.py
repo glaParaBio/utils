@@ -6,23 +6,28 @@ import shutil
 import os
 import subprocess as sp
 
-class TestMakeDb(unittest.TestCase):
 
+class TestMakeDb(unittest.TestCase):
     def setUp(self):
-        sys.stderr.write('\n' + self.id().split('.')[-1] + ' ') # Print test name
-        if os.path.exists('test_out'):
-            shutil.rmtree('test_out')
-        os.mkdir('test_out')
+        sys.stderr.write("\n" + self.id().split(".")[-1] + " ")  # Print test name
+        if os.path.exists("test_out"):
+            shutil.rmtree("test_out")
+        os.mkdir("test_out")
 
     def tearDown(self):
-        if os.path.exists('test_out'):
-            shutil.rmtree('test_out')
+        if os.path.exists("test_out"):
+            shutil.rmtree("test_out")
 
     def testShowHelp(self):
-        p = sp.Popen("./makeBioconductorAnnotationDbi.r --help", shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(
+            "./makeBioconductorAnnotationDbi.r --help",
+            shell=True,
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+        )
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
-        self.assertTrue('--gff', stderr.decode())
+        self.assertTrue("--gff", stderr.decode())
 
     def testMinimal(self):
         cmd = r"""./makeBioconductorAnnotationDbi.r \
@@ -32,7 +37,7 @@ class TestMakeDb(unittest.TestCase):
                     -s testBergheiANKA \
                     --install
                 """
-        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
 
@@ -43,10 +48,10 @@ class TestMakeDb(unittest.TestCase):
                     -g Plasmodium_bar \
                     -s testBergheiANKA
                 """
-        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(1, p.returncode)
-        self.assertTrue('Invalid name' in stderr.decode())
+        self.assertTrue("Invalid name" in stderr.decode())
 
     def testMakeFromLocalGzFiles(self):
         cmd = r"""./makeBioconductorAnnotationDbi.r --gff test/data/PlasmoDB-59_PbergheiANKA.gff.gz \
@@ -59,7 +64,7 @@ class TestMakeDb(unittest.TestCase):
                 -m 'dario ber <d.ber@gmail.com>' \
                 -a 'dario ber' \
                 --install"""
-        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
 
@@ -78,7 +83,7 @@ class TestMakeDb(unittest.TestCase):
                 -m 'dario ber <d.ber@gmail.com>' \
                 -a 'dario ber' \
                 --install"""
-        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
 
@@ -93,7 +98,7 @@ class TestMakeDb(unittest.TestCase):
                 -m 'dario ber <d.ber@gmail.com>' \
                 -a 'dario ber' \
                 --install"""
-        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
 
@@ -108,24 +113,38 @@ class TestMakeDb(unittest.TestCase):
                 -m 'dario ber <d.ber@gmail.com>' \
                 -a 'dario ber'
                 """
-        p = sp.Popen(cmd, shell=True, stdout= sp.PIPE, stderr= sp.PIPE)
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode)
-        
-        with open('test_out/org/org.PtestBergheiANKA.eg.db/DESCRIPTION') as fh:
+
+        with open("test_out/org/org.PtestBergheiANKA.eg.db/DESCRIPTION") as fh:
             description = fh.readlines()
         self.assertTrue(len(description) > 5)
 
-        desc_entry = [x for x in description if x.startswith('Description:')]
+        desc_entry = [x for x in description if x.startswith("Description:")]
         self.assertTrue(len(desc_entry) == 1)
         desc_entry = desc_entry[0]
-        self.assertTrue('./makeBioconductorAnnotationDbi.r' in desc_entry)
-        self.assertTrue('./makeBioconductorAnnotationDbi.r' in desc_entry)
-        self.assertTrue('version:' in desc_entry)
-        self.assertTrue('Genome wide annotation' in desc_entry)
+        self.assertTrue("./makeBioconductorAnnotationDbi.r" in desc_entry)
+        self.assertTrue("./makeBioconductorAnnotationDbi.r" in desc_entry)
+        self.assertTrue("version:" in desc_entry)
+        self.assertTrue("Genome wide annotation" in desc_entry)
 
-        pckg_version = [x for x in description if x == 'Version: 1.2.3\n']
+        pckg_version = [x for x in description if x == "Version: 1.2.3\n"]
         self.assertTrue(len(pckg_version) == 1)
 
-if __name__ == '__main__':
+    def testGafFromNcbi(self):
+        cmd = r"""./makeBioconductorAnnotationDbi.r \
+                --gff https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/016/432/855/GCF_016432855.1_SaNama_1.0/GCF_016432855.1_SaNama_1.0_genomic.gff.gz \
+                --gaf https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/016/432/855/GCF_016432855.1_SaNama_1.0/GCF_016432855.1_SaNama_1.0_gene_ontology.gaf.gz \
+                -g Sceloporus \
+                -s naumachus \
+                -o test_out/org \
+                --install
+        """
+        p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(0, p.returncode)
+
+
+if __name__ == "__main__":
     unittest.main()

@@ -93,8 +93,10 @@ a GFF file and a GAF file of gene IDs and associated GO terms
 
 options:
   -h, --help            show this help message and exit
-  --gff GFF             GFF local file or URL [required]
-  --gaf GAF             GAF local file or URL linking GO terms to genes
+  --gff GFF             GFF local file or URL. Gzip input ok provided the
+                        filename ends with .gz [required]
+  --gaf GAF             GAF local file or URL linking GO terms to genes. Gzip
+                        input ok provided the filename ends with .gz
                         [required]
   --genus GENUS, -g GENUS
                         Genus name [required]
@@ -125,7 +127,6 @@ options:
   --install, -I         If set, also install the package in the default R
                         library
   --version, -v         show program's version number and exit
-./makeBioconductorAnnotationDbi.r -h
 ```
 
 (Printout above maybe outdated)
@@ -159,6 +160,9 @@ NA | NA | gene | NA | NA | NA | NA | NA | ID=PBANKA_1329900
 
 * **Gene annotation file**: A tab-separated file with no header with three
   columns (additional columns ignored) for gene id, go, and evidence.
+
+Input files can be gzip compressed, but they must have extension .gz for the
+script to recognise them as such. Lines starting with `#` or `!` are skipped.
 
 Notes
 =====

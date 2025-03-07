@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library(data.table))
 suppressPackageStartupMessages(library(AnnotationForge))
 suppressPackageStartupMessages(library(GO.db))
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 
 get_command_call <- function() {
     cmdArgs <- commandArgs(trailingOnly = FALSE)
@@ -18,16 +18,25 @@ get_command_call <- function() {
     return(cmdCall)
 }
 
-reader <- function(fileOrUrl, ...) {
+reader <- function(fileOrUrl, type, ...) {
     options(warn=2)
-    grepcmd <- "awk '{if($0 ~ /^##FASTA/) {exit 0} else {print $0}}' | grep -v -P '^#|^!gaf-version'"
-    if(grepl('^http', fileOrUrl) == TRUE) {
+    if (type == 'gff') {
+        grepcmd <- "awk '{if($0 ~ /^##FASTA/) {exit 0} else {print $0}}' | grep -v -P '^#'"
+    } else if (type == 'gaf') {
+        grepcmd <- "grep -v -P '^!'"
+    } else {
+        stop(sprintf('Input type must be gff or gaf. Got: "%s"', type))
+    }
+    if(grepl('^http', tolower(fileOrUrl)) == TRUE && grepl('*\\.gz$', tolower(fileOrUrl))) {
+        cmd <- sprintf('curl -s -L %s | gzip -cd | %s', fileOrUrl, grepcmd)
+    } else if(grepl('^http', tolower(fileOrUrl)) == TRUE) {
         cmd <- sprintf('curl -s -L %s | %s', fileOrUrl, grepcmd)
-    } else if(grepl('*.gz$', fileOrUrl) == TRUE) {
+    } else if(grepl('*\\.gz$', tolower(fileOrUrl)) == TRUE) {
         cmd <- sprintf('gzip -cd %s | %s', fileOrUrl, grepcmd) 
     } else {
         cmd <- sprintf("cat %s | %s", fileOrUrl,  grepcmd)
     }
+    cat(sprintf('%s\n', cmd))
     ff <- fread(cmd=cmd, ...)
     options(warn=0)
     return(ff)
@@ -38,7 +47,7 @@ get_package_name <- function(outdir, genus, species) {
     pkg <- sprintf('org.%s%s.eg.db', g, species)
     path <- file.path(outdir, pkg)
     return(path)
-} 
+}
 
 delete_existing_package <- function(path) {
     if(file.exists(path) == TRUE) {
@@ -64,13 +73,11 @@ autodetect_genes <- function(gff, include) {
 
 gff_to_dbitable <- function(gff_file, feature_types='AUTO', keep_attributes='ALL', include_ids=NULL) {
     # Read gff file and return table suitable for annotationForge
-
-    gff <- reader(gff_file, header=FALSE, sep='\t')
+    gff <- reader(gff_file, type='gff', header=FALSE, sep='\t')
     stopifnot(names(gff) == sprintf('V%s', 1:9))
     setnames(gff, c('V1', 'V3', 'V4', 'V5', 'V7', 'V9'), c('CHROM', 'FEATURE_TYPE', 'GID_START', 'GID_END', 'GID_STRAND', 'ATTRIBUTES'))
 
     gff[, ID := get_gff_attribute(ATTRIBUTES, 'ID')]
-
     if(length(feature_types) == 1 && feature_types == 'AUTO') {
         gff <- autodetect_genes(gff, include_ids)
     } else {
@@ -88,6 +95,7 @@ gff_to_dbitable <- function(gff_file, feature_types='AUTO', keep_attributes='ALL
         gff <- merge(gff, attributes, by='ID', sort=FALSE)
     }
     setnames(gff, 'ID', 'GID')
+    gff[, GID := as.character(GID)]
     gff[, ATTRIBUTES := NULL]
     gff[is.na(gff)] <- 'n/a'
     return(gff)
@@ -95,10 +103,9 @@ gff_to_dbitable <- function(gff_file, feature_types='AUTO', keep_attributes='ALL
 
 attributes_to_table <- function(gff_attr, keep='ALL') {
     # Convert the vector of GFF attributes (column 9 in GFF) to data.table
-    if(is.na(keep) || is.null(keep) || length(keep) == 0 || keep == '') {
+    if(any(is.na(keep)) || any(is.null(keep)) || length(keep) == 0 || all(keep == '')) {
         keep <- 'ID'
     }
-    
     keys <- unlist(strsplit(gff_attr, ';'))
     keys <- unique(sapply(keys, function(x) strsplit(x, '=')[[1]][1], USE.NAMES=FALSE))
     if(length(keep) == 1 && keep == 'ALL') {
@@ -166,8 +173,8 @@ is_validate_name_for_package <- function(name) {
 }
 
 parser <- ArgumentParser(description='Prepare a Bioconductor annotationDbi (i.e. a package like org.Hs.eg.db) given a GFF file and a GAF file of gene IDs and associated GO terms')
-parser$add_argument('--gff', help='GFF local file or URL [required]', required=TRUE)
-parser$add_argument('--gaf', help='GAF local file or URL linking GO terms to genes [required]', required=TRUE)
+parser$add_argument('--gff', help='GFF local file or URL. Gzip input ok provided the filename ends with .gz [required]', required=TRUE)
+parser$add_argument('--gaf', help='GAF local file or URL linking GO terms to genes. Gzip input ok provided the filename ends with .gz [required]', required=TRUE)
 parser$add_argument('--genus', '-g', help='Genus name [required]', required=TRUE)
 parser$add_argument('--species', '-s', help='Species name [required]', required=TRUE)
 parser$add_argument('--pckg-version', '-p', help='Version you want to give to this package. Must be in decimal format e.g. "0.1.2" [%(default)s]', default='0.1')
@@ -196,8 +203,9 @@ if(sys.nframe() == 0){
 
     idx <- xargs$gaf_column_idx
     names(idx) <- c('GID', 'GO', 'EVIDENCE')
-    gaf <- reader(xargs$gaf, header=FALSE, sep='\t', select=as.numeric(idx), col.names=names(idx))
+    gaf <- reader(xargs$gaf, type='gaf', header=FALSE, sep='\t', select=as.numeric(idx), col.names=names(idx))
     gaf <- unique(gaf)
+    gaf[, GID := as.character(GID)]
 
     gff <- gff_to_dbitable(xargs$gff, feature_types=xargs$feature_types,
                            keep_attributes=xargs$attributes,
@@ -207,7 +215,6 @@ if(sys.nframe() == 0){
     delete_existing_package(pkg_name)
 
     dir.create(xargs$outdir, showWarnings=FALSE, recursive=TRUE)
-    
     sink(stderr(), type = "output")
     suppressMessages(
     name <- makeOrgPackage(gene_info=gff, go=gaf,
