@@ -22,8 +22,14 @@ test_that("Can convert GFF to dbi table", {
     expect_equal(dbi$GID_START[1], 1175534)
     expect_equal(dbi$GID_START[nrow(dbi)], 276592)
 
-    # From URL    
+    # From URL
     dbi <- gff_to_dbitable('https://plasmodb.org/common/downloads/release-55/PbergheiANKA/gff/data/PlasmoDB-55_PbergheiANKA.gff', 'AUTO', '')
+    expect_equal(names(dbi), STANDARD_COLUMNS)
+    expect_equal(dbi$GID_START[1], 1175534)
+    expect_equal(dbi$GID_START[nrow(dbi)], 276592)
+
+    # From GZ URL
+    dbi <- gff_to_dbitable('https://raw.githubusercontent.com/glaParaBio/utils/refs/heads/master/makeBioconductorAnnotationDbi/test/data/PlasmoDB-59_PbergheiANKA.gff.gz', 'AUTO', '')
     expect_equal(names(dbi), STANDARD_COLUMNS)
     expect_equal(dbi$GID_START[1], 1175534)
     expect_equal(dbi$GID_START[nrow(dbi)], 276592)
@@ -58,7 +64,7 @@ test_that("Can autodetect genes", {
     dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids=NULL)
     expect_equal(dbi$FEATURE_TYPE, rep('protein_coding_gene', 6))
     expect_true('PBANKA_1307600' %in% dbi$GID)
-    
+
     dbi <- gff_to_dbitable('data/short.gff', 'AUTO', '', include_ids='exon_PBANKA_1112300.1-E1')
     expect_true('PBANKA_1307600' %in% dbi$GID)
     expect_true('exon_PBANKA_1112300.1-E1' %in% dbi$GID)

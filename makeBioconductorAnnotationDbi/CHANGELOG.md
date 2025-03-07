@@ -1,8 +1,11 @@
-# New in 0.3.0
+# New in 0.4.0
 
 * Skip lines starting with `!`
-* Read gzip URL
 * Handle numeric identifiers
+
+# New in 0.3.0
+
+* Read gzip URL
 
 # New in 0.2.0
 
