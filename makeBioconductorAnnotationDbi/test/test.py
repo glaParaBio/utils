@@ -35,6 +35,7 @@ class TestMakeDb(unittest.TestCase):
                     --gaf test/data/PlasmoDB-59_PbergheiANKA_GO.gaf.gz \
                     -g Plasmodium \
                     -s testBergheiANKA \
+                    -o test_out/org \
                     --install
                 """
         p = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
@@ -133,9 +134,10 @@ class TestMakeDb(unittest.TestCase):
         self.assertTrue(len(pckg_version) == 1)
 
     def testGafFromNcbi(self):
+        # These files come from https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/016/432/855/GCF_016432855.1_SaNama_1.0/
         cmd = r"""./makeBioconductorAnnotationDbi.r \
-                --gff https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/016/432/855/GCF_016432855.1_SaNama_1.0/GCF_016432855.1_SaNama_1.0_genomic.gff.gz \
-                --gaf https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/016/432/855/GCF_016432855.1_SaNama_1.0/GCF_016432855.1_SaNama_1.0_gene_ontology.gaf.gz \
+                --gff https://raw.githubusercontent.com/glaParaBio/utils/refs/heads/master/makeBioconductorAnnotationDbi/test/data/GCF_016432855.1_SaNama_1.0_genomic.gff.gz \
+                --gaf https://raw.githubusercontent.com/glaParaBio/utils/refs/heads/master/makeBioconductorAnnotationDbi/test/data/GCF_016432855.1_SaNama_1.0_gene_ontology.gaf.gz \
                 -g Sceloporus \
                 -s naumachus \
                 -o test_out/org \
