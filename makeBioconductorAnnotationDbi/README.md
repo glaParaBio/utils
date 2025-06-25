@@ -1,6 +1,6 @@
 <!-- vim-markdown-toc GFM -->
 
-* [Quick start for the inpatient](#quick-start-for-the-inpatient)
+* [Quick start for the impatient](#quick-start-for-the-impatient)
 * [Description](#description)
 * [Installation](#installation)
 * [Usage](#usage)
@@ -13,7 +13,7 @@ You need an [annotationDbi](https://bioconductor.org/packages/release/bioc/html/
 [clusterProfiler](https://bioconductor.org/packages/release/bioc/html/clusterProfiler.html))
 but your species doesn't have one. Here's a script to make it.
 
-Quick start for the inpatient 
+Quick start for the impatient 
 ===========
 
 The minimal input to create an
